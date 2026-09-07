@@ -1,0 +1,142 @@
+# NHN vocoder
+
+这是一个面向 72 维 LLSM 条件特征的轻量、非自回归 harmonic-plus-noise
+声码器实现。它依据参考图实现了非因果门控卷积、三路动态 FIR 频谱头、十段噪声控制和
+16 子带 PQMF 后处理，并加入 pyllsm2 分析、数据集、训练、checkpoint 与推理入口。
+
+## 输入与输出
+
+每帧恰好 72 维：
+
+| 索引 | 内容 | 约定范围 |
+| --- | --- | --- |
+| 0 | VUV 清/浊音 | 0 或 1 |
+| 1 | F0（Hz） | 0–2000（无声段可为 0） |
+| 2 | Rd 声门参数 | 0.02–3.0 |
+| 3–66 | pyllsm2 Coder 的 64 维谱编码 | 默认归一化范围 -100–40 |
+| 67–71 | 5 段 BAP | 0–1 |
+
+输入形状可以是 `[T,72]`、`[B,T,72]` 或 `[B,72,T]`。默认 48 kHz、hop=256，
+输出形状为 `[B,1,T*256]`。若上游特征使用不同的帧移，只需同步修改
+`NHNVocoderConfig.hop_length`；训练 WAV 的采样率必须与配置一致。
+
+## 使用
+
+项目使用 Python 3.12 和 uv。在仓库根目录同步基础训练环境：
+
+```bash
+uv sync --dev
+```
+
+分析 WAV 还需要 pyllsm2 和外部 F0 分析器：
+
+```bash
+CFLAGS="-Wno-error=implicit-function-declaration" uv sync --extra analysis
+```
+
+在 macOS 上，如果当前 pyllsm2 版本被 Apple Clang 的隐式声明检查拦截，可使用：
+
+```bash
+CFLAGS="-Wno-error=implicit-function-declaration" \
+  python -m pip install pyllsm2==0.2.0
+```
+
+pyllsm2 自身不包含 F0 提取。本项目默认使用更适合歌声的 FCPE，也可选择 RMVPE
+或与 pyllsm2 官方测试一致的 Praat/Parselmouth。F0 会对齐到 libllsm2 的帧移，
+然后交给原生 `Coder(order_spec=64, order_bap=5)`；编码结果正好是
+`3 + 64 + 5 = 72` 维。批量分析目录：
+
+推荐直接使用统一预处理命令。它会递归扫描原始 WAV，将配对 WAV/NPY 写入训练目录，
+最后生成 `feature_stats.npz` 和 `preprocess_report.json`：
+
+```bash
+uv run nhn-preprocess raw_wavs data/train --f0-backend fcpe --f0-device cpu
+```
+
+支持中断后重跑：已经存在的 NPY 会跳过，但仍会重新汇总全部成功文件的统计信息。
+需要强制重算时添加 `--overwrite`，任意文件失败时立即停止可添加 `--fail-fast`。
+
+下面的 `nhn-analyze` 和 `nhn-stats` 保留给需要单独调试某一步的场景：
+
+```bash
+python -m vocoder.analyze data/train --sample-rate 48000 --hop-length 256
+```
+
+选择 F0 后端：
+
+```bash
+python -m vocoder.analyze data/train --f0-backend fcpe --f0-device cuda
+python -m vocoder.analyze data/train --f0-backend rmvpe
+python -m vocoder.analyze data/train --f0-backend parselmouth
+```
+
+- `fcpe`：默认，针对单声道歌声，速度快，对快速音高变化较友好。
+- `rmvpe`：噪声或残留伴奏条件下通常更稳，本实现采用 ONNX CPU 推理。
+- `parselmouth`：依赖最轻、行为容易复现，适合作为兼容和排错后端。
+
+该命令递归查找 WAV，并在每个 WAV 旁生成同名 NPY。已有 NPY 默认跳过；需要重做时
+添加 `--overwrite`。单文件和独立输出目录也受支持：
+
+```bash
+python -m vocoder.analyze input.wav --output input.npy
+python -m vocoder.analyze raw_wavs --output data/train
+```
+
+训练数据为同名文件对，例如 `001.npy`（`float32 [T,72]`）与 `001.wav`
+（48 kHz、mono/可自动混为 mono、16-bit PCM）：
+
+```bash
+uv run nhn-train data/train checkpoints/run1 \
+  --batch-size 8 --segment-seconds 2 --device cpu
+```
+
+训练先使用 waveform/STFT/Mel/相位/瞬时频率/F0 谐波复合损失；默认从第 10,000
+step 开启轻量 HiFi-GAN 风格 MPD/MSD、LSGAN 和 feature matching：
+
+```bash
+uv run nhn-train data/train checkpoints/run1 \
+  --gan-start-step 10000 --adversarial-weight 1 --feature-matching-weight 2
+```
+
+MPD/MSD 只参与训练，不会增加 `NHNVocoder` 的推理参数量。对很小的数据做快速
+过拟合时，可将 `--gan-start-step` 调到 100–1000；从第 0 step 启用通常不稳定。
+
+如果数据目录含统一预处理生成的 `feature_stats.npz`，训练会自动加载，无需再传
+`--feature-stats`；也可以显式指定另一份统计文件覆盖自动选择。
+
+训练目录会生成 `latest.pt`、`best.pt`、`training.jsonl` 和 `tensorboard/`。
+断点续训：
+
+```bash
+uv run nhn-train data/train checkpoints/run1 \
+  --resume checkpoints/run1/latest.pt --epochs 200
+```
+
+CUDA 训练可添加 `--device cuda --amp`；禁用混合精度使用 `--no-amp`。没有独立
+验证目录时，默认固定抽取 5% 文件作为验证集，也可用 `--validation-data data/valid`。
+
+推理：
+
+```bash
+uv run nhn-infer example.npy checkpoints/run1/best.pt output.wav --device cpu
+```
+
+噪声分支由 `--seed` 固定，因此同一特征和 checkpoint 可以得到可复现结果。
+后续上层输入适配和 Python SDK 的接口边界见
+[输入扩展与 SDK 规划](../docs/vocoder-input-sdk-plan.md)。
+
+## 性能说明
+
+- 默认网络按参考图的通道数设计，float32 权重约 12 MB；实际 checkpoint 还会包含
+  固定 PQMF/噪声滤波 buffer；带两个 optimizer 和判别器的训练 checkpoint 会显著更大。
+- 当前 16 子带 PQMF 使用 254-tap 抗混叠滤波器。参考机器上 8 个 CPU 线程生成
+  2 秒/48 kHz 未训练样例约 0.67 秒；实际速度需在目标机器用训练后模型复测。
+- 网络是一次性并行生成而非逐采样自回归，CPU 通常会很有竞争力。是否能达到
+  “2 秒音频 CPU 比 GPU 快”取决于 CPU、PyTorch 构建、线程数和传输开销，不能由
+  架构本身保证。
+- 8 GB 是运行时激活/训练图的预算描述，不是模型大小；推理时务必使用
+  `torch.inference_mode()`。长音频建议在应用层按重叠片段切分。
+- 未训练 checkpoint 只会产生近静音/噪声，必须用配对 LLSM/WAV 数据训练后才有
+  可用音质。
+- pyllsm2/libllsm2 使用 GPL-3.0-or-later；如果项目计划闭源或商业分发，请先评估
+  其许可证影响，或向上游作者咨询替代许可。

@@ -1,0 +1,5 @@
+numpy>=1.24
+praat-parselmouth>=0.4.6
+pyllsm2==0.2.0
+rmvpe-onnx>=0.2.3; python_version >= "3.10"
+torchfcpe>=0.0.4

@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "melostudio-nhn-vocoder"
+version = "0.1.0"
+description = "Compact NHN-inspired vocoder for 72-D LLSM features"
+readme = "vocoder/README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "numpy>=1.26",
+  "tensorboard>=2.18",
+  "torch>=2.4",
+]
+
+[project.optional-dependencies]
+analysis = [
+  "praat-parselmouth>=0.4.6",
+  "pyllsm2==0.2.0",
+  "torchfcpe>=0.0.4",
+]
+rmvpe = [
+  "rmvpe-onnx>=0.2.3",
+]
+
+[project.scripts]
+nhn-analyze = "vocoder.analyze:main"
+nhn-infer = "vocoder.infer:main"
+nhn-preprocess = "vocoder.preprocess:main"
+nhn-stats = "vocoder.stats:main"
+nhn-train = "vocoder.train:main"
+
+[dependency-groups]
+dev = ["pytest>=8.3"]
+
+[tool.setuptools.packages.find]
+include = ["vocoder*"]
+
+[tool.pytest.ini_options]
+testpaths = ["vocoder/tests"]
