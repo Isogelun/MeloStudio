@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -21,27 +22,55 @@ class LLSMWavDataset(Dataset[Tuple[Tensor, Tensor]]):
         hop_length: int = 256,
         segment_frames: Optional[int] = None,
         random_crop: bool = True,
+        manifest: str | Path | None = None,
+        group_variants: bool = False,
     ):
         self.root = Path(root)
         self.sample_rate = sample_rate
         self.hop_length = hop_length
         self.segment_frames = segment_frames
         self.random_crop = random_crop
+        self.group_variants = group_variants
         if segment_frames is not None and segment_frames <= 0:
             raise ValueError("segment_frames must be positive")
         self.items: List[Tuple[Path, Path]] = []
-        for feature_path in sorted(self.root.rglob("*.npy")):
-            wav_path = feature_path.with_suffix(".wav")
-            if wav_path.is_file():
+        item_ids: list[str] = []
+        if manifest is not None:
+            manifest_path = Path(manifest)
+            if not manifest_path.is_absolute():
+                manifest_path = self.root / manifest_path
+            for line_number, line in enumerate(manifest_path.read_text(encoding="utf-8").splitlines(), 1):
+                if not line.strip():
+                    continue
+                row = json.loads(line)
+                feature_path = (self.root / row["features"]).resolve()
+                wav_path = (self.root / row["target"]).resolve()
+                if not feature_path.is_relative_to(self.root.resolve()) or not wav_path.is_relative_to(self.root.resolve()):
+                    raise ValueError(f"manifest path escapes dataset root at line {line_number}")
+                if not feature_path.is_file() or not wav_path.is_file():
+                    raise FileNotFoundError(f"missing manifest item at line {line_number}")
                 self.items.append((feature_path, wav_path))
+                item_ids.append(str(row.get("id", row["features"])))
+        else:
+            for feature_path in sorted(self.root.rglob("*.npy")):
+                wav_path = feature_path.with_suffix(".wav")
+                if wav_path.is_file():
+                    self.items.append((feature_path, wav_path))
+                    item_ids.append(str(feature_path.relative_to(self.root).with_suffix("")))
         if not self.items:
             raise ValueError(f"no matching .npy/.wav pairs found below {self.root}")
+        grouped: dict[str, list[Tuple[Path, Path]]] = {}
+        for item_id, item in zip(item_ids, self.items):
+            grouped.setdefault(item_id, []).append(item)
+        self.groups = list(grouped.values()) if group_variants else [[item] for item in self.items]
 
     def __len__(self) -> int:
-        return len(self.items)
+        return len(self.groups)
 
     def __getitem__(self, index: int) -> Tuple[Tensor, Tensor]:
-        feature_path, wav_path = self.items[index]
+        group = self.groups[index]
+        variant = int(torch.randint(len(group), ()).item()) if self.group_variants else 0
+        feature_path, wav_path = group[variant]
         features = np.load(feature_path, allow_pickle=False).astype(np.float32)
         if features.ndim != 2 or 72 not in features.shape:
             raise ValueError(f"{feature_path} must have shape [T,72] or [72,T]")

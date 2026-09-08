@@ -74,14 +74,33 @@ Kaiser-window cosine-modulated 设计，并针对 16 子带采用更窄截止频
 训练步数与验证片段下至少跑 baseline 与本版本两组，记录 Mel/STFT 损失，并做盲听。
 尤其需要观察清辅音、高音长音、气声、音高滑音，以及片段边界是否出现相位点击。
 
-## 第三优先级：数据分析
+## 第三优先级：数据分析（已完成）
 
 - [x] 在批量任务中复用 FCPE/RMVPE 模型实例
-- [ ] 自动重采样、float/24-bit WAV 和 FLAC
-- [ ] 按 48 kHz 母带构造严格对齐的多采样率→48 kHz BWE 训练对
-- [ ] 增加 BWE manifest、重采样延迟与对齐质量报告
-- [ ] 削波、静音、F0 跳变、NaN/Inf 和长度质量报告
-- [ ] FCPE/RMVPE 数据集级对照报告
+- [x] 自动重采样、float/24-bit WAV 和 FLAC
+- [x] 按 48 kHz 母带构造严格对齐的多采样率→48 kHz BWE 训练对
+- [x] 增加 BWE manifest、重采样配置与对齐质量报告
+- [x] 削波、静音、F0 跳变、NaN/Inf 和长度质量报告
+- [x] FCPE/RMVPE 数据集级对照报告
+
+### P3 已实现入口
+
+```bash
+# 普通数据：自动读取 WAV/FLAC 和任意原始采样率，统一生成 48 kHz 配对数据
+uv run nhn-preprocess raw_audio data/train --f0-backend fcpe
+
+# 48 kHz 母带：生成多种来源带宽的 LLSM72，target 始终为原始 48 kHz
+uv run nhn-preprocess-bwe masters_48k data/bwe_train \
+  --source-sample-rates 8000,12000,16000,22050,24000,32000,44100,48000
+
+# 数据集级 F0 后端对照
+uv run nhn-compare-f0 raw_audio reports/f0-comparison.json \
+  --first fcpe --second rmvpe
+```
+
+BWE 输出采用 `features/name@采样率.npy`、共享的 `targets/name.wav` 和
+`manifests/train.jsonl|valid.jsonl`。训练器检测到 manifest 后会按母带 id 分组：训练时
+每个母带随机抽一个采样率变体，验证时保留全部变体。
 
 ## 第四优先级：部署
 

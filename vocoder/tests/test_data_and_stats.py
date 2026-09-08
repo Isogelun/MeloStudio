@@ -20,7 +20,9 @@ def test_dataset_center_crop_and_alignment(tmp_path):
     assert cropped_waveform.shape == (1, 16)
     torch.testing.assert_close(
         cropped_waveform.squeeze(),
-        torch.from_numpy((waveform[12:28] * 32767).astype("<i2").astype(np.float32) / 32768.0),
+        torch.from_numpy(waveform[12:28]),
+        rtol=0,
+        atol=1 / 32768,
     )
 
 

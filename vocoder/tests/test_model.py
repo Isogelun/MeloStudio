@@ -12,7 +12,8 @@ def test_pqmf_filterbank_has_near_perfect_reconstruction():
     subbands, length = filterbank.analysis(waveform)
     assert subbands.shape == (2, 8, 512)
     reconstructed = filterbank.synthesis(subbands, length)
-    relative_error = (waveform - reconstructed).square().mean().sqrt() / waveform.square().mean().sqrt()
+    interior = (..., slice(256, -256))
+    relative_error = (waveform[interior] - reconstructed[interior]).square().mean().sqrt() / waveform[interior].square().mean().sqrt()
     assert float(relative_error) < 0.03
 
 

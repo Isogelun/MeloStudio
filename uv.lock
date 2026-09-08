@@ -481,6 +481,8 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "numpy" },
+    { name = "scipy" },
+    { name = "soundfile" },
     { name = "tensorboard" },
     { name = "torch" },
 ]
@@ -506,6 +508,8 @@ requires-dist = [
     { name = "praat-parselmouth", marker = "extra == 'analysis'", specifier = ">=0.4.6" },
     { name = "pyllsm2", marker = "extra == 'analysis'", specifier = "==0.2.0" },
     { name = "rmvpe-onnx", marker = "extra == 'rmvpe'", specifier = ">=0.2.3" },
+    { name = "scipy", specifier = ">=1.14" },
+    { name = "soundfile", specifier = ">=0.12" },
     { name = "tensorboard", specifier = ">=2.18" },
     { name = "torch", specifier = ">=2.4" },
     { name = "torchfcpe", marker = "extra == 'analysis'", specifier = ">=0.0.4" },

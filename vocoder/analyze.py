@@ -8,7 +8,8 @@ from typing import Iterable, Iterator, Tuple
 
 import numpy as np
 
-from .audio import read_wav
+from .audio import AUDIO_SUFFIXES, read_audio
+from .resample import resample_audio
 
 
 def extract_f0_parselmouth(
@@ -311,14 +312,16 @@ def analyze_waveform(
 
 def analyze_wav(path: str | Path, **kwargs) -> np.ndarray:
     sample_rate = int(kwargs.get("sample_rate", 48_000))
-    waveform, _ = read_wav(path, expected_sample_rate=sample_rate)
+    waveform, native_sample_rate = read_audio(path)
+    if native_sample_rate != sample_rate:
+        waveform = resample_audio(waveform, native_sample_rate, sample_rate)
     return analyze_waveform(waveform, **kwargs)
 
 
 def _jobs(source: Path, output: Path | None) -> Iterator[Tuple[Path, Path]]:
     if source.is_file():
-        if source.suffix.lower() != ".wav":
-            raise ValueError("input file must have a .wav suffix")
+        if source.suffix.lower() not in AUDIO_SUFFIXES:
+            raise ValueError("input file must be WAV or FLAC")
         target = output if output is not None else source.with_suffix(".npy")
         if target.suffix.lower() != ".npy":
             target = target / source.with_suffix(".npy").name
@@ -326,16 +329,19 @@ def _jobs(source: Path, output: Path | None) -> Iterator[Tuple[Path, Path]]:
         return
     if not source.is_dir():
         raise FileNotFoundError(source)
-    for wav_path in sorted(source.rglob("*.wav")):
-        relative = wav_path.relative_to(source).with_suffix(".npy")
-        yield wav_path, (output / relative if output is not None else wav_path.with_suffix(".npy"))
+    audio_paths = sorted(
+        path for path in source.rglob("*") if path.suffix.lower() in AUDIO_SUFFIXES
+    )
+    for audio_path in audio_paths:
+        relative = audio_path.relative_to(source).with_suffix(".npy")
+        yield audio_path, (output / relative if output is not None else audio_path.with_suffix(".npy"))
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Analyze WAV into native [VUV,F0,Rd,64 spectrum,5 BAP] features"
+        description="Analyze WAV/FLAC into native [VUV,F0,Rd,64 spectrum,5 BAP] features"
     )
-    parser.add_argument("input", type=Path, help="one WAV or a directory searched recursively")
+    parser.add_argument("input", type=Path, help="one WAV/FLAC or a directory searched recursively")
     parser.add_argument("--output", type=Path, help="output .npy or mirrored output directory")
     parser.add_argument("--sample-rate", type=int, default=48_000)
     parser.add_argument("--hop-length", type=int, default=256)

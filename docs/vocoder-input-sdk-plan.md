@@ -2,6 +2,10 @@
 
 ## 目标与边界
 
+实现状态：本文中的多格式读取、自动重采样、多采样率训练对、manifest、质量报告和
+F0 后端比较已经在 P3 落地；`VocoderSession`、adapter registry 与直接接收低采样率
+WAV 的统一推理入口仍属于 P4。
+
 最终采样率约定：
 
 ```text

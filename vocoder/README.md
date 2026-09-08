@@ -82,12 +82,34 @@ python -m vocoder.analyze input.wav --output input.npy
 python -m vocoder.analyze raw_wavs --output data/train
 ```
 
+普通预处理支持 PCM/float WAV、FLAC、自动混为 mono，并会把非 48 kHz 输入自动重采样。
 训练数据为同名文件对，例如 `001.npy`（`float32 [T,72]`）与 `001.wav`
-（48 kHz、mono/可自动混为 mono、16-bit PCM）：
+（48 kHz mono target）：
 
 ```bash
 uv run nhn-train data/train checkpoints/run1 \
   --batch-size 8 --segment-seconds 2 --device cpu
+```
+
+需要让同一个模型在推理时接受低于 48 kHz 的来源并补全到 48 kHz，可从 48 kHz 母带
+建立多采样率 BWE 数据集：
+
+```bash
+uv run nhn-preprocess-bwe masters_48k data/bwe_train \
+  --source-sample-rates 8000,12000,16000,22050,24000,32000,44100,48000 \
+  --f0-backend fcpe --f0-device cpu
+
+uv run nhn-train data/bwe_train checkpoints/bwe1 --device cuda
+```
+
+该数据集的训练 target 始终为原始 48 kHz WAV；不同来源采样率只改变输入 LLSM。
+预处理会生成分组 train/valid manifest、统计和质量报告，训练器会自动识别。
+
+对照 FCPE 与 RMVPE：
+
+```bash
+uv run nhn-compare-f0 raw_audio reports/f0-comparison.json \
+  --first fcpe --second rmvpe
 ```
 
 训练先使用 waveform/STFT/Mel/相位/瞬时频率/F0 谐波复合损失；默认从第 10,000

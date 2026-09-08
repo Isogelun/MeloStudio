@@ -44,6 +44,20 @@ def _split_datasets(
     validation_split: float,
     seed: int,
 ):
+    train_manifest = root / "manifests/train.jsonl"
+    valid_manifest = root / "manifests/valid.jsonl"
+    if validation_root is None and train_manifest.is_file():
+        train_data = LLSMWavDataset(
+            root, config.sample_rate, config.hop_length, segment_frames,
+            random_crop=True, manifest=train_manifest, group_variants=True,
+        )
+        validation_data = None
+        if valid_manifest.is_file() and valid_manifest.stat().st_size:
+            validation_data = LLSMWavDataset(
+                root, config.sample_rate, config.hop_length, segment_frames,
+                random_crop=False, manifest=valid_manifest, group_variants=False,
+            )
+        return train_data, validation_data
     train_data = LLSMWavDataset(
         root, config.sample_rate, config.hop_length, segment_frames, random_crop=True
     )

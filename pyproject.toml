@@ -10,6 +10,8 @@ readme = "vocoder/README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
   "numpy>=1.26",
+  "scipy>=1.14",
+  "soundfile>=0.12",
   "tensorboard>=2.18",
   "torch>=2.4",
 ]
@@ -26,8 +28,10 @@ rmvpe = [
 
 [project.scripts]
 nhn-analyze = "vocoder.analyze:main"
+nhn-compare-f0 = "vocoder.compare_f0:main"
 nhn-infer = "vocoder.infer:main"
 nhn-preprocess = "vocoder.preprocess:main"
+nhn-preprocess-bwe = "vocoder.preprocess_bwe:main"
 nhn-stats = "vocoder.stats:main"
 nhn-train = "vocoder.train:main"
 

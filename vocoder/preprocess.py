@@ -2,20 +2,22 @@ from __future__ import annotations
 
 import argparse
 import json
-import shutil
 from pathlib import Path
 
 import numpy as np
 
-from .analyze import F0Extractor, analyze_wav
+from .analyze import F0Extractor, analyze_waveform
+from .audio import AUDIO_SUFFIXES, read_audio, write_wav
+from .quality import analyze_quality
+from .resample import resample_audio
 from .stats import compute_feature_stats
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Prepare paired WAV/72-D LLSM data and feature statistics in one run"
+        description="Prepare resampled WAV/FLAC and 72-D LLSM training pairs in one run"
     )
-    parser.add_argument("input", type=Path, help="raw WAV directory")
+    parser.add_argument("input", type=Path, help="raw WAV/FLAC directory")
     parser.add_argument("output", type=Path, help="training dataset output directory")
     parser.add_argument("--sample-rate", type=int, default=48_000)
     parser.add_argument("--hop-length", type=int, default=256)
@@ -43,30 +45,33 @@ def main() -> None:
         raise SystemExit(f"input directory does not exist: {source_root}")
     if output_root != source_root and output_root.is_relative_to(source_root):
         raise SystemExit("output may not be nested inside input; it would be scanned again")
-    wav_paths = sorted(source_root.rglob("*.wav"))
-    if not wav_paths:
-        raise SystemExit(f"no WAV files found below {source_root}")
+    audio_paths = sorted(
+        path for path in source_root.rglob("*") if path.suffix.lower() in AUDIO_SUFFIXES
+    )
+    if not audio_paths:
+        raise SystemExit(f"no WAV/FLAC files found below {source_root}")
     output_root.mkdir(parents=True, exist_ok=True)
     extractor = F0Extractor(args.f0_backend, args.f0_device)
     successful = []
     records = []
-    for index, source_wav in enumerate(wav_paths, start=1):
+    for index, source_wav in enumerate(audio_paths, start=1):
         relative = source_wav.relative_to(source_root)
-        target_wav = output_root / relative
+        target_wav = (output_root / relative).with_suffix(".wav")
         target_feature = target_wav.with_suffix(".npy")
         try:
-            if target_feature.exists() and not args.overwrite:
-                if target_wav != source_wav and not target_wav.exists():
-                    target_wav.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(source_wav, target_wav)
+            if target_feature.exists() and target_wav.exists() and not args.overwrite:
                 features = np.load(target_feature, mmap_mode="r", allow_pickle=False)
                 if features.ndim != 2 or 72 not in features.shape:
                     raise ValueError(f"existing feature has invalid shape {features.shape}")
                 frame_count = int(features.shape[1] if features.shape[0] == 72 else features.shape[0])
+                waveform, native_sample_rate = read_audio(target_wav)
                 status = "skipped"
             else:
-                features = analyze_wav(
-                    source_wav,
+                waveform, native_sample_rate = read_audio(source_wav)
+                if native_sample_rate != args.sample_rate:
+                    waveform = resample_audio(waveform, native_sample_rate, args.sample_rate)
+                features = analyze_waveform(
+                    waveform,
                     sample_rate=args.sample_rate,
                     hop_length=args.hop_length,
                     f0_min=args.f0_min,
@@ -79,8 +84,8 @@ def main() -> None:
                     f0_extractor=extractor,
                 )
                 target_wav.parent.mkdir(parents=True, exist_ok=True)
-                if target_wav != source_wav:
-                    shutil.copy2(source_wav, target_wav)
+                if target_wav != source_wav or native_sample_rate != args.sample_rate:
+                    write_wav(target_wav, waveform, args.sample_rate)
                 np.save(target_feature, features, allow_pickle=False)
                 frame_count = int(features.shape[0])
                 status = "processed"
@@ -91,9 +96,12 @@ def main() -> None:
                     "status": status,
                     "frames": frame_count,
                     "seconds": frame_count * args.hop_length / args.sample_rate,
+                    "source_sample_rate": native_sample_rate,
+                    "target_sample_rate": args.sample_rate,
+                    "quality": analyze_quality(waveform, features),
                 }
             )
-            print(f"[{index}/{len(wav_paths)}] {status}: {relative} -> {frame_count} frames")
+            print(f"[{index}/{len(audio_paths)}] {status}: {relative} -> {frame_count} frames")
         except Exception as error:
             records.append(
                 {"file": str(relative), "status": "failed", "error": str(error)}
@@ -123,6 +131,7 @@ def main() -> None:
             "processed": sum(item["status"] == "processed" for item in records),
             "skipped": sum(item["status"] == "skipped" for item in records),
             "failed": sum(item["status"] == "failed" for item in records),
+            "warnings": sum(len(item.get("quality", {}).get("warnings", [])) for item in records),
             "frames": int(stats["count"]),
             "hours": float(stats["count"]) * args.hop_length / args.sample_rate / 3600,
         },
