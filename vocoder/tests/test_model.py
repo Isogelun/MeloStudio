@@ -28,6 +28,19 @@ def test_framewise_fir_overlap_add_has_gradients():
     assert torch.isfinite(coefficients.grad).all()
 
 
+def test_framewise_fir_export_path_matches_fft():
+    fir = FramewiseFIRFilter(16)
+    excitation = torch.randn(2, 1, 48)
+    coefficients = torch.randn(2, 16, 3)
+    expected = fir(excitation, coefficients)
+    fir.export_mode = True
+    actual = fir(excitation, coefficients)
+    torch.testing.assert_close(actual, expected, rtol=1e-5, atol=1e-5)
+    fir.onnx_mode = True
+    actual_onnx_path = fir(excitation[:1], coefficients[:1])
+    torch.testing.assert_close(actual_onnx_path, expected[:1], rtol=1e-5, atol=1e-5)
+
+
 def test_output_length_and_layouts():
     config = NHNVocoderConfig(
         hop_length=32,

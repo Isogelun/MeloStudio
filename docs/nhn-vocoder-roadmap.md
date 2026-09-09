@@ -102,15 +102,45 @@ BWE 输出采用 `features/name@采样率.npy`、共享的 `targets/name.wav` �
 `manifests/train.jsonl|valid.jsonl`。训练器检测到 manifest 后会按母带 id 分组：训练时
 每个母带随机抽一个采样率变体，验证时保留全部变体。
 
-## 第四优先级：部署
+## 第四优先级：部署（已完成基础版）
 
-- [ ] 按 [输入扩展与 SDK 规划](vocoder-input-sdk-plan.md) 实现稳定上层接口
-- [ ] 统一 `vocoder_bwe` checkpoint 的输入采样率 metadata 与覆盖范围校验
-- [ ] 重叠分块长音频推理
-- [ ] 纯推理 checkpoint 导出
-- [ ] TorchScript/ONNX 导出
-- [ ] float16/bfloat16/int8 基准
-- [ ] CPU/GPU 的 RTF 与峰值内存基准
+- [x] 按 [输入扩展与 SDK 规划](vocoder-input-sdk-plan.md) 实现稳定上层接口
+- [x] 统一 `vocoder_bwe` checkpoint 的输入采样率 metadata 与覆盖范围校验
+- [x] 重叠分块长音频推理
+- [x] 纯推理 checkpoint 导出
+- [x] TorchScript/ONNX 导出
+- [x] float32/float16/bfloat16/int8 能力检测与基准报告
+- [x] CPU/GPU 的 RTF 与峰值内存基准工具
+
+### P4 已实现入口
+
+```bash
+# NPY/NPZ 或任意 <=48 kHz 的 WAV/FLAC，固定输出 48 kHz mono WAV
+uv run nhn-synthesize input.wav checkpoints/bwe/best.pt output.wav \
+  --device cpu --f0-backend fcpe --chunk-frames 750 --overlap-frames 32
+
+# 去掉 optimizer、scheduler、scaler 和判别器，只保留推理权重
+uv run nhn-export checkpoints/bwe/best.pt deploy/inference.pt \
+  --format checkpoint
+
+# TorchScript 支持可变帧数；ONNX 当前固定 batch=1 和导出时的帧数
+uv run nhn-export deploy/inference.pt deploy/model.ts --format torchscript --frames 375
+uv run nhn-export deploy/inference.pt deploy/model.onnx --format onnx --frames 375
+
+# 在目标机器上测 RTF、p95 延迟、模型大小和峰值内存
+uv run nhn-benchmark deploy/inference.pt --seconds 2 --runs 10 \
+  --device cpu --dtypes float32,bfloat16,float16,int8
+```
+
+SDK 接受 NumPy、Torch、NPY/NPZ、72 维字段 mapping 和音频输入。低采样率音频会先
+重采样到模型的 48 kHz 分析时间轴，再执行 F0+pyllsm2 分析；只有带
+`task_mode=vocoder_bwe` 且 metadata 覆盖对应来源采样率的 checkpoint 才应被当作
+真正的带宽扩展模型。普通 48 kHz vocoder 权重即使能运行，也没有学会恢复缺失高频。
+
+当前 ONNX 为固定长度部署图，这是动态逐帧 FIR 在 ONNX 中的兼容性取舍；长音频应由
+SDK 分块后送入固定长度后端。基准命令会如实报告设备不支持的 dtype，而不会静默回退。
+本机 CPU 实测 2 秒条件的纯声码器平均约 0.136 秒（RTF 约 0.068）；GPU 数字仍需在
+实际 CUDA 机器运行同一命令，不能用 CPU 结果推断。
 
 ## 推荐验收顺序
 

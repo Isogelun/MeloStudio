@@ -25,14 +25,21 @@ analysis = [
 rmvpe = [
   "rmvpe-onnx>=0.2.3",
 ]
+export = [
+  "onnx>=1.17",
+  "onnxruntime>=1.20",
+]
 
 [project.scripts]
 nhn-analyze = "vocoder.analyze:main"
+nhn-benchmark = "vocoder.benchmark:main"
 nhn-compare-f0 = "vocoder.compare_f0:main"
+nhn-export = "vocoder.export:main"
 nhn-infer = "vocoder.infer:main"
 nhn-preprocess = "vocoder.preprocess:main"
 nhn-preprocess-bwe = "vocoder.preprocess_bwe:main"
 nhn-stats = "vocoder.stats:main"
+nhn-synthesize = "vocoder.synthesize:main"
 nhn-train = "vocoder.train:main"
 
 [dependency-groups]

@@ -213,6 +213,8 @@ class FramewiseFIRFilter(nn.Module):
     def __init__(self, taps: int):
         super().__init__()
         self.taps = taps
+        self.export_mode = False
+        self.onnx_mode = False
 
     def forward(self, excitation: Tensor, coefficients: Tensor) -> Tensor:
         if excitation.ndim != 3 or excitation.shape[1] != 1:
@@ -228,12 +230,33 @@ class FramewiseFIRFilter(nn.Module):
         blocks = excitation.view(batch, frames, self.taps)
         kernels = coefficients.transpose(1, 2)
         kernels = torch.tanh(kernels) / math.sqrt(self.taps)
-        fft_size = self.taps * 2
-        filtered = torch.fft.irfft(
-            torch.fft.rfft(blocks, n=fft_size)
-            * torch.fft.rfft(kernels, n=fft_size),
-            n=fft_size,
-        )
+        if self.onnx_mode:
+            if batch != 1:
+                raise ValueError("ONNX FIR export currently supports batch size 1")
+            filtered = torch.stack(
+                [
+                    F.conv1d(
+                        blocks[:, index : index + 1],
+                        kernels[:, index : index + 1].flip(-1),
+                        padding=self.taps - 1,
+                    ).squeeze(1)
+                    for index in range(frames)
+                ],
+                dim=1,
+            )
+            filtered = F.pad(filtered, (0, 1))
+        elif self.export_mode:
+            padded = F.pad(blocks, (self.taps - 1, self.taps - 1))
+            windows = padded.unfold(-1, self.taps, 1)
+            filtered = (windows * kernels.flip(-1).unsqueeze(-2)).sum(-1)
+            filtered = F.pad(filtered, (0, 1))
+        else:
+            fft_size = self.taps * 2
+            filtered = torch.fft.irfft(
+                torch.fft.rfft(blocks, n=fft_size)
+                * torch.fft.rfft(kernels, n=fft_size),
+                n=fft_size,
+            )
         leading, trailing = filtered[..., : self.taps], filtered[..., self.taps :]
         # The last tail lies beyond the requested signal.  Every other tail is
         # added to the next block, producing differentiable partitioned OLA.

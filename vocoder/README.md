@@ -137,27 +137,57 @@ uv run nhn-train data/train checkpoints/run1 \
 CUDA 训练可添加 `--device cuda --amp`；禁用混合精度使用 `--no-amp`。没有独立
 验证目录时，默认固定抽取 5% 文件作为验证集，也可用 `--validation-data data/valid`。
 
-推理：
+推理。旧入口继续支持 NPY；统一入口还支持 NPZ、字段 mapping 的 SDK 调用，以及
+WAV/FLAC 音频分析。音频输入允许不高于 48 kHz，输出始终取 checkpoint 的 48 kHz：
 
 ```bash
 uv run nhn-infer example.npy checkpoints/run1/best.pt output.wav --device cpu
+
+uv run nhn-synthesize input_16k.wav checkpoints/bwe1/best.pt output_48k.wav \
+  --device cpu --f0-backend fcpe --chunk-frames 750 --overlap-frames 32
 ```
 
 噪声分支由 `--seed` 固定，因此同一特征和 checkpoint 可以得到可复现结果。
-后续上层输入适配和 Python SDK 的接口边界见
+Python SDK：
+
+```python
+from vocoder import LLSMFeatures, VocoderSession
+
+session = VocoderSession.from_checkpoint("checkpoints/bwe1/best.pt", device="cpu")
+features = LLSMFeatures.from_numpy(values)  # [T, 72] 或 [72, T]
+audio = session.synthesize_chunked(features, chunk_frames=750, overlap_frames=32)
+audio.save("output_48k.wav")
+
+# 音频入口会重采样、提取 F0/LLSM，并检查 checkpoint 的 BWE metadata
+audio = session.synthesize_waveform("input_16k.wav", f0_backend="fcpe")
+```
+
+部署导出与目标机器基准：
+
+```bash
+uv sync --extra export
+uv run nhn-export checkpoints/bwe1/best.pt deploy/inference.pt --format checkpoint
+uv run nhn-export deploy/inference.pt deploy/model.ts --format torchscript --frames 375
+uv run nhn-export deploy/inference.pt deploy/model.onnx --format onnx --frames 375
+uv run nhn-benchmark deploy/inference.pt --seconds 2 --runs 10 --device cpu
+```
+
+TorchScript 可接收不同帧数。当前 ONNX 导出固定 `batch=1` 和 `--frames` 指定的长度；
+长音频使用 SDK 分块。float16/bfloat16/int8 是否可用由基准程序按目标设备和算子组合
+实际检测，不支持时会明确报告。完整接口边界见
 [输入扩展与 SDK 规划](../docs/vocoder-input-sdk-plan.md)。
 
 ## 性能说明
 
 - 默认网络按参考图的通道数设计，float32 权重约 12 MB；实际 checkpoint 还会包含
   固定 PQMF/噪声滤波 buffer；带两个 optimizer 和判别器的训练 checkpoint 会显著更大。
-- 当前 16 子带 PQMF 使用 254-tap 抗混叠滤波器。参考机器上 8 个 CPU 线程生成
-  2 秒/48 kHz 未训练样例约 0.67 秒；实际速度需在目标机器用训练后模型复测。
+- 当前 16 子带 PQMF 使用 254-tap 抗混叠滤波器。本机本轮基准生成 2 秒/48 kHz
+  条件约 0.136 秒（RTF 约 0.068）；实际速度需在目标机器用训练后模型复测。
 - 网络是一次性并行生成而非逐采样自回归，CPU 通常会很有竞争力。是否能达到
   “2 秒音频 CPU 比 GPU 快”取决于 CPU、PyTorch 构建、线程数和传输开销，不能由
   架构本身保证。
-- 8 GB 是运行时激活/训练图的预算描述，不是模型大小；推理时务必使用
-  `torch.inference_mode()`。长音频建议在应用层按重叠片段切分。
+- 8 GB 是运行时激活/训练图的预算描述，不是模型大小；SDK 使用
+  `torch.inference_mode()`，长音频可用 `synthesize_chunked` 重叠分块。
 - 未训练 checkpoint 只会产生近静音/噪声，必须用配对 LLSM/WAV 数据训练后才有
   可用音质。
 - pyllsm2/libllsm2 使用 GPL-3.0-or-later；如果项目计划闭源或商业分发，请先评估

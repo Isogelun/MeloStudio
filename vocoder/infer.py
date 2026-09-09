@@ -3,11 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-import numpy as np
-import torch
-
-from .audio import write_wav
-from .checkpoint import load_checkpoint
+from .sdk import VocoderSession
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -22,15 +18,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = build_parser().parse_args()
-    model = load_checkpoint(args.checkpoint, args.device)
-    values = np.load(args.features, allow_pickle=False).astype(np.float32)
-    features = torch.from_numpy(values).to(args.device)
-    generator = torch.Generator(device=args.device).manual_seed(args.seed)
-    with torch.inference_mode():
-        waveform = model(features, generator=generator).squeeze().cpu().numpy()
-    write_wav(args.output, waveform, model.config.sample_rate)
+    session = VocoderSession.from_checkpoint(
+        args.checkpoint, device=args.device, seed=args.seed
+    )
+    session.synthesize(args.features, seed=args.seed).save(args.output)
 
 
 if __name__ == "__main__":
     main()
-

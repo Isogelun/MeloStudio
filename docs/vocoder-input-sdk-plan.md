@@ -2,9 +2,10 @@
 
 ## 目标与边界
 
-实现状态：本文中的多格式读取、自动重采样、多采样率训练对、manifest、质量报告和
-F0 后端比较已经在 P3 落地；`VocoderSession`、adapter registry 与直接接收低采样率
-WAV 的统一推理入口仍属于 P4。
+实现状态：P3 的多格式读取、自动重采样、多采样率训练对、manifest、质量报告和 F0
+后端比较，以及 P4 的 `VocoderSession`、adapter registry、低采样率 WAV 统一推理、
+重叠分块、纯 checkpoint 和 TorchScript/ONNX 导出均已落地。流式迭代器与取消机制
+仍是后续服务化扩展，不属于本轮基础部署接口。
 
 最终采样率约定：
 
@@ -412,7 +413,7 @@ L_total = L_base
 覆盖，SDK 默认给出分布外 warning；严格模式可以拒绝。48 kHz 输入和受支持的低采样率
 输入都使用同一个 `vocoder_bwe` checkpoint。
 
-## SDK 分层与建议文件结构
+## SDK 分层与实际文件结构
 
 ```text
 vocoder/
@@ -420,17 +421,13 @@ vocoder/
 │   ├── __init__.py
 │   ├── session.py          # VocoderSession
 │   ├── types.py            # LLSMFeatures / AudioResult / metadata
-│   ├── validation.py       # 形状、范围和配置校验
-│   ├── registry.py         # FeatureAdapter registry
-│   └── adapters/
-│       ├── numpy.py
-│       ├── torch.py
-│       ├── mapping.py
-│       ├── waveform.py
-│       └── bwe.py
-├── resample.py             # 唯一重采样入口、延迟补偿
+│   ├── adapters.py         # NumPy/Torch/路径/mapping adapter registry
+│   └── errors.py           # 稳定公开异常
 ├── preprocess_bwe.py       # 48 kHz 母带 → BWE 配对数据
-└── infer.py                # CLI 薄封装，内部调用 SDK
+├── synthesize.py           # 统一特征/音频 CLI
+├── infer.py                # 兼容旧 NPY CLI，内部调用 SDK
+├── export.py               # 纯 checkpoint/TorchScript/ONNX
+└── benchmark.py            # dtype、RTF 与峰值内存基准
 ```
 
 核心模型 `NHNVocoder.forward(features)` 不接受路径、WAV 或采样率参数。所有外部输入在
@@ -444,7 +441,7 @@ vocoder/
 uv run nhn-infer input.npy best.pt output.wav --device cpu
 ```
 
-增加上层友好的统一入口：
+已增加上层友好的统一入口：
 
 ```bash
 # 自动读取任意 <=48 kHz WAV，并固定输出 48 kHz
@@ -454,7 +451,7 @@ uv run nhn-synthesize input.wav vocoder_bwe.pt output_48k.wav --device cpu
 uv run nhn-synthesize features.npz vocoder.pt output.wav \
   --input-format llsm72
 
-# 输出诊断 metadata，但不生成音频
+# 执行完整推理诊断并输出 metadata，但不写 WAV 文件
 uv run nhn-synthesize input.wav vocoder_bwe.pt output.wav --validate-only
 ```
 
@@ -512,16 +509,16 @@ session.stream(feature_chunks, lookahead_frames=...) -> Iterator[AudioChunk]
 72 维布局命名为 `llsm72-v1`；checkpoint 已有独立 `format_version`。两者不能混用：
 前者描述特征语义，后者描述权重/网络兼容性。SDK 公共 API 按语义版本管理。
 
-## 实施顺序
+## 实施状态
 
-### SDK 第一阶段
+### SDK 第一阶段（已完成）
 
 - 建立 `LLSMFeatures`、`AudioResult`、校验器和 `VocoderSession`。
 - 支持 NumPy、Torch、路径和字段 mapping。
 - 让现有 `nhn-infer` 改为调用 SDK，但保持原 CLI 参数兼容。
 - 测试布局转换、错误输入、seed 复现、checkpoint 采样率和 batch。
 
-### SDK 第二阶段
+### SDK 第二阶段（已完成）
 
 - 加入 WAV/波形分析适配器，复用 FCPE/RMVPE/pyllsm2 实例。
 - 加入统一 `vocoder_bwe` 模式、原始采样率 metadata 和训练覆盖范围校验。
@@ -529,11 +526,14 @@ session.stream(feature_chunks, lookahead_frames=...) -> Iterator[AudioChunk]
 - 加入插件式 adapter registry，供 MeloStudio 上层注册声学模型输出。
 - 加入设备、线程数和推理统计信息。
 
-### SDK 第三阶段
+### SDK 第三阶段（基础部署已完成）
 
 - 重叠分块长音频推理。
-- 流式接口和取消机制。
 - 纯推理 checkpoint、TorchScript/ONNX 后端适配。
+
+尚未实现的服务层能力：真正的增量流式迭代器和取消机制。现有
+`synthesize_chunked` 面向长音频离线推理，使用重叠交叉淡化并严格保持目标长度；它
+不是低延迟流式协议。
 
 ## 验收标准
 

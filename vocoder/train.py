@@ -148,7 +148,16 @@ def main() -> None:
         header = torch.load(args.resume, map_location="cpu", weights_only=False)
         config = NHNVocoderConfig.from_dict(header.get("config", {}))
     else:
-        config = NHNVocoderConfig()
+        config_values = {}
+        report_path = args.data / "preprocess_report.json"
+        if report_path.is_file():
+            report_config = json.loads(report_path.read_text(encoding="utf-8")).get("config", {})
+            if report_config.get("task_mode") == "vocoder_bwe":
+                config_values = {
+                    "task_mode": "vocoder_bwe",
+                    "trained_input_sample_rates": tuple(report_config["source_sample_rates"]),
+                }
+        config = NHNVocoderConfig(**config_values)
     segment_frames = max(
         1, round(args.segment_seconds * config.sample_rate / config.hop_length)
     )

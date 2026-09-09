@@ -116,10 +116,11 @@ class NHNVocoder(nn.Module):
             features = features.unsqueeze(0)
         if features.ndim != 3:
             raise ValueError("features must have shape [T,72], [B,T,72], or [B,72,T]")
+        dtype = self.input_proj.weight.dtype
         if features.shape[1] == self.config.feature_dim:
-            return features.float()
+            return features.to(dtype=dtype)
         if features.shape[2] == self.config.feature_dim:
-            return features.transpose(1, 2).float()
+            return features.transpose(1, 2).to(dtype=dtype)
         raise ValueError(f"expected a 72-dimensional feature axis, got {tuple(features.shape)}")
 
     def _harmonic_source(self, physical: Tensor) -> Tensor:
@@ -170,7 +171,10 @@ class NHNVocoder(nn.Module):
         noise_gains = self.noise_proc(hidden)
         noise_excitation = self._noise_source(physical, noise_gains, generator)
         energy = physical[:, 3:67].mean(dim=1, keepdim=True)
-        energy = torch.diff(energy, dim=-1, prepend=energy[..., :1]).abs()
+        energy = torch.cat(
+            (torch.zeros_like(energy[..., :1]), energy[..., 1:] - energy[..., :-1]),
+            dim=-1,
+        ).abs()
         transient = F.interpolate(
             energy, size=harmonic_excitation.shape[-1], mode="nearest"
         ) * noise_excitation
@@ -197,6 +201,16 @@ class NHNVocoder(nn.Module):
     @property
     def parameter_count(self) -> int:
         return sum(parameter.numel() for parameter in self.parameters())
+
+    def set_export_mode(
+        self, enabled: bool = True, *, onnx: bool = False
+    ) -> "NHNVocoder":
+        """Use an FFT-free FIR path compatible with graph exporters."""
+
+        for module in self.fir_filters:
+            module.export_mode = enabled
+            module.onnx_mode = enabled and onnx
+        return self
 
     @property
     def size_megabytes_fp32(self) -> float:
