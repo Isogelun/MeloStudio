@@ -2,9 +2,11 @@ import numpy as np
 import pytest
 
 from vocoder.benchmark import benchmark_checkpoint
-from vocoder.checkpoint import save_checkpoint
+from vocoder.checkpoint import load_checkpoint, save_checkpoint
 from vocoder.config import NHNVocoderConfig
+from vocoder.dsp import DSPConfig, DSPControlPredictor
 from vocoder.model import NHNVocoder
+from vocoder.post_train import save_post_training_checkpoint
 
 
 def _checkpoint(tmp_path):
@@ -35,3 +37,18 @@ def test_benchmark_rejects_invalid_request(tmp_path):
         benchmark_checkpoint(
             _checkpoint(tmp_path), np.zeros((4, 72), dtype=np.float32), runs=0
         )
+
+
+def test_benchmark_includes_posttrained_dsp_head(tmp_path):
+    base_path = _checkpoint(tmp_path)
+    base = load_checkpoint(base_path)
+    post = save_post_training_checkpoint(
+        tmp_path / "post.pt",
+        base,
+        DSPControlPredictor(config=DSPConfig(hidden_channels=8)),
+    )
+    report = benchmark_checkpoint(
+        post, np.zeros((4, 72), dtype=np.float32), warmup=0, runs=1
+    )
+    assert report["results"][0]["status"] == "ok"
+    assert report["results"][0]["model_parameters_mb"] > 0

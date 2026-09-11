@@ -11,6 +11,12 @@ import numpy as np
 import torch
 
 from .checkpoint import load_checkpoint
+from .dsp import (
+    DSPAugmentedVocoder,
+    DSPConfig,
+    DSPControlPredictor,
+    DifferentiableDSP,
+)
 
 
 DTYPES = {
@@ -47,6 +53,7 @@ def benchmark_checkpoint(
     if warmup < 0 or runs < 1:
         raise ValueError("warmup must be non-negative and runs must be positive")
     target_device = torch.device(device)
+    payload = torch.load(checkpoint, map_location="cpu", weights_only=False)
     results = []
     baseline = None
     for name in dtypes:
@@ -62,7 +69,17 @@ def benchmark_checkpoint(
         if name not in DTYPES:
             raise ValueError(f"unsupported dtype: {name}")
         try:
-            model = load_checkpoint(checkpoint, target_device).to(dtype=DTYPES[name])
+            model = load_checkpoint(checkpoint, target_device)
+            if "dsp_predictor" in payload:
+                dsp_config = DSPConfig.from_dict(payload.get("dsp_config"))
+                predictor = DSPControlPredictor(config=dsp_config)
+                predictor.load_state_dict(payload["dsp_predictor"])
+                model = DSPAugmentedVocoder(
+                    model,
+                    predictor,
+                    DifferentiableDSP(dsp_config),
+                ).to(target_device).eval()
+            model = model.to(dtype=DTYPES[name])
             tensor = torch.from_numpy(features).unsqueeze(0).to(target_device, dtype=DTYPES[name])
             duration = features.shape[0] * model.config.hop_length / model.config.sample_rate
             if target_device.type == "cuda":

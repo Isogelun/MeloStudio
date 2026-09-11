@@ -32,6 +32,9 @@ def export_inference_checkpoint(source: str | Path, output: str | Path) -> Path:
         "step": payload.get("step", 0),
         "metrics": payload.get("metrics", {}),
     }
+    for key in ("dsp_predictor", "dsp_config"):
+        if key in payload:
+            pure[key] = payload[key]
     output = Path(output)
     output.parent.mkdir(parents=True, exist_ok=True)
     torch.save(pure, output)
@@ -39,6 +42,12 @@ def export_inference_checkpoint(source: str | Path, output: str | Path) -> Path:
 
 
 def export_torchscript(source: str | Path, output: str | Path, frames: int = 32) -> Path:
+    payload = torch.load(source, map_location="cpu", weights_only=False)
+    if "dsp_predictor" in payload:
+        raise NotImplementedError(
+            "DSP post-trained graph export is not available yet; export the pure "
+            "checkpoint and run it through VocoderSession"
+        )
     model = load_checkpoint(source, "cpu").set_export_mode(False)
     wrapper = InferenceWrapper(model).eval()
     example = torch.zeros(1, frames, 72)
@@ -56,6 +65,12 @@ def export_onnx(source: str | Path, output: str | Path, frames: int = 32) -> Pat
         import onnx
     except ImportError as error:
         raise RuntimeError("ONNX export requires: uv sync --extra export") from error
+    payload = torch.load(source, map_location="cpu", weights_only=False)
+    if "dsp_predictor" in payload:
+        raise NotImplementedError(
+            "DSP post-trained graph export is not available yet; export the pure "
+            "checkpoint and run it through VocoderSession"
+        )
     model = load_checkpoint(source, "cpu").set_export_mode(True, onnx=True)
     wrapper = InferenceWrapper(model).eval()
     example = torch.zeros(1, frames, 72)

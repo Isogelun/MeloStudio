@@ -3,8 +3,10 @@ import torch
 
 from vocoder.checkpoint import load_checkpoint, save_checkpoint
 from vocoder.config import NHNVocoderConfig
+from vocoder.dsp import DSPControlPredictor
 from vocoder.export import export_inference_checkpoint, export_onnx, export_torchscript
 from vocoder.model import NHNVocoder
+from vocoder.post_train import save_post_training_checkpoint
 
 
 def _checkpoint(tmp_path):
@@ -47,3 +49,21 @@ def test_fixed_shape_onnx_export_runs(tmp_path):
     session = onnxruntime.InferenceSession(str(output), providers=["CPUExecutionProvider"])
     waveform = session.run(None, {"features": torch.zeros(1, 7, 72).numpy()})[0]
     assert waveform.shape == (1, 1, 7 * 32)
+
+
+def test_pure_checkpoint_preserves_dsp_head_and_graph_export_refuses_it(tmp_path):
+    base = NHNVocoder(NHNVocoderConfig(
+        hop_length=32, residual_channels=16, skip_channels=16,
+        primary_dilations=(1, 3), subbands=8, pqmf_taps=62,
+        pqmf_cutoff_ratio=0.071, denoiser_channels=8,
+        denoiser_dilations=(1, 3), max_harmonics=4,
+    ))
+    source = save_post_training_checkpoint(
+        tmp_path / "post.pt", base, DSPControlPredictor()
+    )
+    output = export_inference_checkpoint(source, tmp_path / "post-inference.pt")
+    payload = torch.load(output, map_location="cpu", weights_only=False)
+    assert "dsp_predictor" in payload
+    assert "dsp_optimizer" not in payload
+    with pytest.raises(NotImplementedError, match="DSP post-trained"):
+        export_torchscript(output, tmp_path / "post.ts")

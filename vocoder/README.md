@@ -177,6 +177,20 @@ TorchScript 可接收不同帧数。当前 ONNX 导出固定 `batch=1` 和 `--fr
 实际检测，不支持时会明确报告。完整接口边界见
 [输入扩展与 SDK 规划](../docs/vocoder-input-sdk-plan.md)。
 
+## P5 DSP 控制与后训练
+
+SDK 现在支持在稳定 LLSM72 基模之上添加帧级 DSP 控制，并可冻结基模、只训练小型
+自动控制头：
+
+```bash
+uv run nhn-post-train data/train checkpoints/run1/best.pt checkpoints/dsp-post \
+  --epochs 20 --batch-size 8 --device cuda --amp
+```
+
+普通 checkpoint 默认完全旁路 DSP；后训练 checkpoint 会自动加载控制头；上层也可用
+`SynthesisRequest` 显式提供控制。设计、范围和 SDK 示例见
+[P5 DSP 与上层后训练](../docs/p5-dsp-post-training.md)。
+
 ## 性能说明
 
 - 默认网络按参考图的通道数设计，float32 权重约 12 MB；实际 checkpoint 还会包含

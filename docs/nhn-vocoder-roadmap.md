@@ -142,6 +142,19 @@ SDK 分块后送入固定长度后端。基准命令会如实报告设备不支�
 本机 CPU 实测 2 秒条件的纯声码器平均约 0.136 秒（RTF 约 0.068）；GPU 数字仍需在
 实际 CUDA 机器运行同一命令，不能用 CPU 结果推断。
 
+## 第五优先级：DSP 与上层后训练（实验版）
+
+- [x] 定义 `SynthesisRequest` 和六维帧级 `DSPControl`
+- [x] 增加可微、可旁路的轻量 DSP pipeline
+- [x] SDK 支持显式控制、自动控制头和分块控制对齐
+- [x] 冻结 NHN 基模，只训练 DSP 控制头
+- [x] 后训练 checkpoint 自动加载与纯 checkpoint 保留
+- [ ] 用正式训练权重完成消融、客观指标和盲听
+- [ ] 确定上层声学模型张量后实现 speaker/style embedding
+- [ ] 将 DSP 控制头合入 TorchScript/ONNX 部署图
+
+接口、训练命令和实验边界见 [P5 DSP 与后训练](p5-dsp-post-training.md)。
+
 ## 推荐验收顺序
 
 1. 用 5–10 条音频进行过拟合测试。

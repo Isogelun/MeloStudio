@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 
 from ..audio import write_wav
+from ..dsp import DSP_CONTROL_NAMES
 from .errors import FeatureValueError, InvalidFeatureShape
 
 
@@ -42,6 +43,58 @@ class LLSMFeatures:
     @property
     def frames(self) -> int:
         return int(self.values.shape[0])
+
+
+@dataclass(frozen=True)
+class DSPControl:
+    """Scalar or frame-rate controls applied after the NHN base waveform."""
+
+    gain_db: float | np.ndarray = 0.0
+    harmonic_tilt: float | np.ndarray = 0.0
+    breathiness: float | np.ndarray = 0.0
+    transient_gain: float | np.ndarray = 0.0
+    deesser_amount: float | np.ndarray = 0.0
+    limiter_amount: float | np.ndarray = 0.0
+
+    @classmethod
+    def from_mapping(cls, value: dict) -> "DSPControl":
+        unknown = set(value) - set(DSP_CONTROL_NAMES)
+        if unknown:
+            raise FeatureValueError(f"unknown DSP controls: {sorted(unknown)}")
+        return cls(**value)
+
+    def to_array(self, frames: int) -> np.ndarray:
+        if frames < 1:
+            raise ValueError("frames must be positive")
+        columns = []
+        for name in DSP_CONTROL_NAMES:
+            value = np.asarray(getattr(self, name), dtype=np.float32)
+            if value.ndim == 0:
+                value = np.full(frames, value.item(), dtype=np.float32)
+            else:
+                value = value.reshape(-1)
+                if value.size != frames:
+                    raise InvalidFeatureShape(
+                        f"DSP control {name} has {value.size} frames, expected {frames}"
+                    )
+            if not np.isfinite(value).all():
+                raise FeatureValueError(f"DSP control {name} contains NaN or infinity")
+            columns.append(value)
+        result = np.stack(columns, axis=1)
+        lower = np.array([-18.0, -1.0, 0.0, -1.0, 0.0, 0.0], dtype=np.float32)
+        upper = np.array([18.0, 1.0, 1.0, 1.0, 1.0, 1.0], dtype=np.float32)
+        if np.any(result < lower) or np.any(result > upper):
+            raise FeatureValueError("DSP control is outside its documented range")
+        return np.ascontiguousarray(result)
+
+
+@dataclass(frozen=True)
+class SynthesisRequest:
+    """Stable upper-layer request contract for feature and DSP conditioning."""
+
+    features: object
+    dsp: DSPControl | None = None
+    metadata: dict = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

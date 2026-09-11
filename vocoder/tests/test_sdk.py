@@ -5,7 +5,7 @@ import torch
 from vocoder.checkpoint import save_checkpoint
 from vocoder.config import NHNVocoderConfig
 from vocoder.model import NHNVocoder
-from vocoder.sdk import FeatureConfigMismatch, LLSMFeatures, VocoderSession
+from vocoder.sdk import DSPControl, FeatureConfigMismatch, LLSMFeatures, VocoderSession
 
 
 def _session(tmp_path):
@@ -69,3 +69,15 @@ def test_sdk_rejects_feature_timing_mismatch(tmp_path):
     session = _session(tmp_path)
     with pytest.raises(FeatureConfigMismatch):
         session.synthesize(LLSMFeatures(_features(), sample_rate=44_100))
+
+
+def test_chunked_explicit_dsp_controls_keep_length(tmp_path):
+    session = _session(tmp_path)
+    result = session.synthesize_chunked(
+        _features(12),
+        chunk_frames=7,
+        overlap_frames=2,
+        dsp_controls=DSPControl(gain_db=np.linspace(-3, 3, 12)),
+    )
+    assert len(result.samples) == 12 * 32
+    assert result.metadata["dsp_control_source"] == "explicit"

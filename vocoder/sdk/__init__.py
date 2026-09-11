@@ -8,11 +8,11 @@ from .errors import (
     VocoderSDKError,
 )
 from .session import VocoderSession
-from .types import AudioResult, LLSMFeatures
+from .types import AudioResult, DSPControl, LLSMFeatures, SynthesisRequest
 
 __all__ = [
-    "AudioResult", "CheckpointCompatibilityError", "FeatureAdapter",
+    "AudioResult", "CheckpointCompatibilityError", "DSPControl", "FeatureAdapter",
     "FeatureAdapterRegistry", "FeatureConfigMismatch", "FeatureValueError",
-    "InvalidFeatureShape", "LLSMFeatures", "UnsupportedInputType",
+    "InvalidFeatureShape", "LLSMFeatures", "SynthesisRequest", "UnsupportedInputType",
     "VocoderSDKError", "VocoderSession", "default_registry",
 ]

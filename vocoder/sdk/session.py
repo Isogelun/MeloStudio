@@ -10,11 +10,12 @@ import torch
 from ..analyze import F0Extractor, analyze_waveform
 from ..audio import AUDIO_SUFFIXES, read_audio
 from ..checkpoint import load_checkpoint
+from ..dsp import DSPConfig, DSPControlPredictor, DifferentiableDSP
 from ..model import NHNVocoder
 from ..resample import resample_audio
 from .adapters import FeatureAdapterRegistry, default_registry
-from .errors import FeatureConfigMismatch, UnsupportedInputType
-from .types import AudioResult, LLSMFeatures
+from .errors import FeatureConfigMismatch, FeatureValueError, UnsupportedInputType
+from .types import AudioResult, DSPControl, LLSMFeatures, SynthesisRequest
 
 
 class VocoderSession:
@@ -26,18 +27,35 @@ class VocoderSession:
         seed: int = 1234,
         adapters: FeatureAdapterRegistry | None = None,
         strict_bandwidth: bool = False,
+        dsp_predictor: DSPControlPredictor | None = None,
+        dsp_config: DSPConfig | None = None,
     ):
         self.device = torch.device(device)
         self.model = model.to(self.device).eval()
         self.seed = seed
         self.adapters = adapters or default_registry()
         self.strict_bandwidth = strict_bandwidth
+        self.dsp = DifferentiableDSP(dsp_config).to(self.device).eval()
+        self.dsp_predictor = (
+            dsp_predictor.to(self.device).eval() if dsp_predictor is not None else None
+        )
         self._f0_extractors: dict[tuple[str, str], F0Extractor] = {}
 
     @classmethod
     def from_checkpoint(cls, path: str | Path, **kwargs) -> "VocoderSession":
         device = kwargs.get("device", "cpu")
-        return cls(load_checkpoint(path, device), **kwargs)
+        payload = torch.load(path, map_location="cpu", weights_only=False)
+        dsp_config = DSPConfig.from_dict(payload.get("dsp_config"))
+        predictor = None
+        if "dsp_predictor" in payload:
+            predictor = DSPControlPredictor(config=dsp_config)
+            predictor.load_state_dict(payload["dsp_predictor"])
+        return cls(
+            load_checkpoint(path, device),
+            dsp_predictor=predictor,
+            dsp_config=dsp_config,
+            **kwargs,
+        )
 
     @property
     def sample_rate(self) -> int:
@@ -57,12 +75,64 @@ class VocoderSession:
     def _generator(self, seed: int | None) -> torch.Generator:
         return torch.Generator(device=self.device).manual_seed(self.seed if seed is None else seed)
 
-    def synthesize(self, source: object, *, seed: int | None = None) -> AudioResult:
+    @staticmethod
+    def _control_array(
+        controls: DSPControl | np.ndarray,
+        frames: int,
+    ) -> np.ndarray:
+        values = (
+            controls.to_array(frames)
+            if isinstance(controls, DSPControl)
+            else np.asarray(controls, dtype=np.float32)
+        )
+        if values.shape == (6, frames):
+            values = values.T
+        if values.shape != (frames, 6) or not np.isfinite(values).all():
+            raise FeatureConfigMismatch(
+                f"DSP controls must have finite shape [{frames},6], got {values.shape}"
+            )
+        lower = np.array([-18.0, -1.0, 0.0, -1.0, 0.0, 0.0], dtype=np.float32)
+        upper = np.array([18.0, 1.0, 1.0, 1.0, 1.0, 1.0], dtype=np.float32)
+        if np.any(values < lower) or np.any(values > upper):
+            raise FeatureValueError("DSP control is outside its documented range")
+        return np.ascontiguousarray(values)
+
+    def _control_tensor(
+        self,
+        controls: DSPControl | np.ndarray,
+        frames: int,
+        dtype: torch.dtype,
+    ) -> torch.Tensor:
+        values = self._control_array(controls, frames)
+        return torch.from_numpy(np.ascontiguousarray(values.T)).unsqueeze(0).to(
+            self.device, dtype=dtype
+        )
+
+    def synthesize(
+        self,
+        source: object,
+        *,
+        seed: int | None = None,
+        dsp_controls: DSPControl | np.ndarray | None = None,
+    ) -> AudioResult:
         features = self.adapters.convert(source)
         self._validate_metadata(features)
         tensor = torch.from_numpy(features.values).unsqueeze(0).to(self.device)
+        generator = self._generator(seed)
+        control_source = "bypass"
         with torch.inference_mode():
-            waveform = self.model(tensor, generator=self._generator(seed))[0, 0].cpu().numpy()
+            waveform = self.model(tensor, generator=generator)
+            if dsp_controls is not None:
+                controls = self._control_tensor(
+                    dsp_controls, features.frames, waveform.dtype
+                )
+                waveform = self.dsp(waveform, controls, generator=generator)
+                control_source = "explicit"
+            elif self.dsp_predictor is not None:
+                controls = self.dsp_predictor(tensor.to(self.dsp_predictor.network[0].weight.dtype))
+                waveform = self.dsp(waveform, controls, generator=generator)
+                control_source = "predicted"
+            waveform = waveform[0, 0].float().cpu().numpy()
         return AudioResult(
             waveform,
             self.sample_rate,
@@ -72,8 +142,32 @@ class VocoderSession:
                 "task_mode": self.model.config.task_mode,
                 "source_sample_rate": features.source_sample_rate,
                 "warnings": list(features.warnings),
+                "dsp_control_source": control_source,
             },
         )
+
+    def synthesize_request(
+        self,
+        request: SynthesisRequest,
+        *,
+        chunk_frames: int | None = None,
+        overlap_frames: int = 32,
+        seed: int | None = None,
+    ) -> AudioResult:
+        result = (
+            self.synthesize_chunked(
+                request.features,
+                chunk_frames=chunk_frames,
+                overlap_frames=overlap_frames,
+                seed=seed,
+                dsp_controls=request.dsp,
+            )
+            if chunk_frames is not None
+            else self.synthesize(request.features, seed=seed, dsp_controls=request.dsp)
+        )
+        metadata = dict(result.metadata)
+        metadata["request_metadata"] = dict(request.metadata)
+        return AudioResult(result.samples, result.sample_rate, metadata=metadata)
 
     def synthesize_batch(
         self, sources: Iterable[object], *, seeds: Iterable[int] | None = None
@@ -91,13 +185,19 @@ class VocoderSession:
         chunk_frames: int = 750,
         overlap_frames: int = 32,
         seed: int | None = None,
+        dsp_controls: DSPControl | np.ndarray | None = None,
     ) -> AudioResult:
         features = self.adapters.convert(source)
         self._validate_metadata(features)
         if chunk_frames <= overlap_frames or overlap_frames < 1:
             raise ValueError("chunk_frames must be greater than positive overlap_frames")
         if features.frames <= chunk_frames:
-            return self.synthesize(features, seed=seed)
+            return self.synthesize(features, seed=seed, dsp_controls=dsp_controls)
+        full_controls = (
+            self._control_array(dsp_controls, features.frames)
+            if dsp_controls is not None
+            else None
+        )
         hop = self.model.config.hop_length
         length = features.frames * hop
         accumulated = np.zeros(length, dtype=np.float64)
@@ -113,7 +213,16 @@ class VocoderSession:
                 source_id=features.source_id, feature_version=features.feature_version,
                 warnings=features.warnings,
             )
-            audio = self.synthesize(chunk, seed=base_seed + index).samples.astype(np.float64)
+            chunk_controls = (
+                np.asarray(full_controls)[start:end]
+                if full_controls is not None
+                else None
+            )
+            audio = self.synthesize(
+                chunk,
+                seed=base_seed + index,
+                dsp_controls=chunk_controls,
+            ).samples.astype(np.float64)
             window = np.ones(len(audio), dtype=np.float64)
             fade = min(overlap_frames * hop, len(audio) // 2)
             if start > 0:
@@ -137,6 +246,10 @@ class VocoderSession:
                 "chunked": True,
                 "chunk_frames": chunk_frames,
                 "overlap_frames": overlap_frames,
+                "dsp_control_source": (
+                    "explicit" if dsp_controls is not None else
+                    "predicted" if self.dsp_predictor is not None else "bypass"
+                ),
             },
         )
 

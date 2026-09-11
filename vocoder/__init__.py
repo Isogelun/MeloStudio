@@ -2,8 +2,9 @@
 
 from .config import NHNVocoderConfig
 from .model import NHNVocoder
-from .sdk import AudioResult, LLSMFeatures, VocoderSession
+from .sdk import AudioResult, DSPControl, LLSMFeatures, SynthesisRequest, VocoderSession
 
 __all__ = [
-    "AudioResult", "LLSMFeatures", "NHNVocoder", "NHNVocoderConfig", "VocoderSession"
+    "AudioResult", "DSPControl", "LLSMFeatures", "NHNVocoder", "NHNVocoderConfig",
+    "SynthesisRequest", "VocoderSession"
 ]
