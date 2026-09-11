@@ -1,24 +1,43 @@
-# This file freezes the trained NHN base and trains only the small DSP control head.
+# NHN DSP 后训练配置
+# 用途：冻结已经训练好的 NHN 基模，只训练轻量 DSP 自动控制头。
+# 必须先得到基模 best.pt，然后执行：
+#   uv run nhn-vocoder train --config configs/nhn-dsp-post.yaml
+# 路径均相对于本 YAML 所在的 configs/ 目录解析。
+
+# 配置类型由统一训练入口读取；不要改成基模配置类型。
 config_type: nhn_dsp_post_train
-description: Post-train automatic gain, tilt, breath, transient, de-esser and limiter controls.
+description: 冻结 NHN 基模，后训练增益、倾斜、气声、瞬态、齿音和限制器控制。
 
 common:
-  # auto selects CUDA, then Apple MPS, then CPU. CLI values can override this.
+  # auto 按 CUDA → Apple MPS → CPU 的顺序选择设备；也可填写 cpu/cuda/mps。
   device: auto
+  # 混合精度；数值异常或目标设备不支持时改为 false。
   amp: true
+  # DataLoader 子进程数。macOS 建议先用 0。
   workers: 0
+  # 随机种子，保证裁剪与初始化可复现。
   seed: 1234
 
 post_train:
-  # Relative paths stay inside this project: data/ and checkpoints/.
+  # 与基模训练一致的 LLSM72/WAV 配对数据目录。
   data: ../data/bwe_train
+  # 已完成基模训练的最佳 checkpoint；该模型参数会被冻结。
   base_checkpoint: ../checkpoints/nhn-base/best.pt
+  # DSP 控制头 checkpoint 和训练日志输出目录。
   output: ../checkpoints/nhn-dsp
+  # DSP 头通常收敛较快，建议先从 10～20 epoch 验证。
   epochs: 20
+  # 每批片段数；显存不足时改为 1。
   batch_size: 2
+  # 每个训练片段秒数，应与基模阶段尽量一致。
   segment_seconds: 2.0
+  # DSP 控制头学习率。
   learning_rate: 0.0001
+  # 控制量偏离中性值的惩罚，避免后处理过重和音色漂移。
   control_regularization: 0.001
+  # DSP 控制预测器隐藏通道数；越大越灵活，但参数和耗时也增加。
   hidden_channels: 64
+  # 每隔多少 optimizer step 保存一次 latest.pt。
   save_every: 1000
+  # 每隔多少 step 写一次训练日志。
   log_every: 20

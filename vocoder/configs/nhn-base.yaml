@@ -1,29 +1,53 @@
-# This file trains the full NHN vocoder base model: LLSM72 -> 48 kHz waveform.
+# NHN 基模训练配置
+# 用途：训练完整的 LLSM72 → 48 kHz 单声道 WAV 声码器。
+# 建议先运行统一预处理，再执行：
+#   uv run nhn-vocoder train --config configs/nhn-base.yaml
+# 路径均相对于本 YAML 所在的 configs/ 目录解析。
+
+# 配置类型由统一训练入口读取；不要改成 DSP 配置类型。
 config_type: nhn_base_train
-description: Train the NHN base vocoder, including reconstruction and GAN stages.
+description: 训练 NHN 基模，包含重建损失阶段和 GAN 精调阶段。
 
 common:
-  # auto selects CUDA, then Apple MPS, then CPU. CLI values can override this.
+  # auto 按 CUDA → Apple MPS → CPU 的顺序选择设备；也可填写 cpu/cuda/mps。
   device: auto
+  # 混合精度训练。CUDA/MPS 可减少显存；数值异常时可改为 false。
   amp: true
+  # DataLoader 子进程数。macOS 建议先用 0，稳定后再增加。
   workers: 0
+  # 随机种子，控制数据切分、裁剪和初始化的可复现性。
   seed: 1234
 
 base_train:
-  # Relative paths stay inside this project: data/ and checkpoints/.
+  # 训练集：包含同名 .npy（float32 [T,72]）和 48 kHz mono .wav。
   data: ../data/bwe_train
+  # checkpoint、日志和 TensorBoard 输出目录。
   output: ../checkpoints/nhn-base
+  # 独立验证集目录；null 表示从训练集按 validation_split 固定划分。
   validation_data: null
+  # 可显式指定 feature_stats.npz；null 时自动读取 data 目录中的统计文件。
   feature_stats: null
+  # 恢复训练用 latest.pt；首次训练保持 null。
   resume: null
+  # validation_data 为 null 时，抽取 5% 样本作为验证集。
   validation_split: 0.05
+  # 完整遍历训练数据的轮数。
   epochs: 200
+  # 每批音频片段数；显存不足时优先降到 1。
   batch_size: 2
+  # 每个训练片段的秒数；越长越占显存，建议从 1～2 秒起步。
   segment_seconds: 2.0
+  # 生成器和判别器的初始学习率。
   learning_rate: 0.0002
+  # AdamW 权重衰减。
   weight_decay: 0.0001
+  # 前 10000 step 只做重建；到达该步数后启用 MPD/MSD 对抗训练。
   gan_start_step: 10000
+  # 对抗损失权重；GAN 不稳定时降低。
   adversarial_weight: 1.0
+  # 判别器 feature matching 权重，用于稳定音色和细节。
   feature_matching_weight: 2.0
+  # 每隔多少 optimizer step 保存一次 latest.pt。
   save_every: 1000
+  # 每隔多少 step 写一次终端、JSONL 和 TensorBoard 日志。
   log_every: 20

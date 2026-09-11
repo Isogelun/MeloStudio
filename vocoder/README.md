@@ -4,6 +4,30 @@
 声码器实现。它依据参考图实现了非因果门控卷积、三路动态 FIR 频谱头、十段噪声控制和
 16 子带 PQMF 后处理，并加入 pyllsm2 分析、数据集、训练、checkpoint 与推理入口。
 
+## 项目导航
+
+| 工作流 | 统一入口 | 底层实现 | 相关配置或文档 |
+| --- | --- | --- | --- |
+| 预处理 | [entrypoints/preprocess.py](entrypoints/preprocess.py) | [preprocessing/](preprocessing/) | [输入与 SDK 规划](docs/vocoder-input-sdk-plan.md) |
+| 训练 | [entrypoints/train.py](entrypoints/train.py) | [training/](training/) | [5～10 小时原型配置](configs/nhn-prototype-5-10h.yaml)、[正式基模配置](configs/nhn-base.yaml)、[DSP 后训练配置](configs/nhn-dsp-post.yaml) |
+| 导出模型 | [entrypoints/export.py](entrypoints/export.py) | [inference/export.py](inference/export.py) | [P4 部署路线](docs/nhn-vocoder-roadmap.md#第四优先级部署已完成基础版) |
+| 推理 | [entrypoints/infer.py](entrypoints/infer.py) | [inference/synthesize.py](inference/synthesize.py) | [Python SDK](sdk/)、[输入与 SDK 规划](docs/vocoder-input-sdk-plan.md) |
+
+核心网络在 [core/](core/)，完整阶段进度见 [NHN Vocoder 完善路线](docs/nhn-vocoder-roadmap.md)，
+DSP 控制和冻结基模后训练的设计见 [P5 DSP 后训练](docs/p5-dsp-post-training.md)。
+正式采集数据或配置机器前，请先看
+[推荐数据量与训练机器](docs/training-data-and-hardware.md)。
+准备使用 5～10 小时数据验证时，直接参考
+[5～10 小时原型训练指南](docs/prototype-training-5-10h.md)。
+
+## 开始前需要准备
+
+- Python 3.12；仓库根目录已有 `.venv`，本目录的 `.venv` 符号链接会复用它。
+- 使用 uv 安装 [pyproject.toml](pyproject.toml) 和 [uv.lock](uv.lock) 中锁定的依赖。
+- 普通训练准备干净的人声 WAV；BWE 训练建议准备原始 48 kHz、单声道或可混为单声道的母带。
+- 特征提取需要 `analysis` 可选依赖；ONNX/TorchScript 部署验证需要 `export` 可选依赖。
+- 训练前先确认磁盘空间：预处理会同时保存 48 kHz WAV、72 维 NPY、统计和报告。
+
 ## 输入与输出
 
 每帧恰好 72 维：
@@ -20,7 +44,7 @@
 输出形状为 `[B,1,T*256]`。若上游特征使用不同的帧移，只需同步修改
 `NHNVocoderConfig.hop_length`；训练 WAV 的采样率必须与配置一致。
 
-## 使用
+## 安装与快速开始
 
 项目使用 Python 3.12 和 uv。先进入 `vocoder/` 项目目录；目录内的 `.venv`
 符号链接会复用仓库根目录现有的 Python 3.12 环境：

@@ -1,0 +1,48 @@
+# NHN 5～10 小时原型验证配置
+# 用途：用一位歌手的 5～10 小时干声验证音质、GAN 和完整训练链路。
+# 推荐先把音频切成平均约 5～12 秒的文件，再执行统一预处理。
+# 训练命令：
+#   uv run nhn-vocoder train --config configs/nhn-prototype-5-10h.yaml
+# 路径均相对于本 YAML 所在的 configs/ 目录解析。
+
+config_type: nhn_base_train
+description: 使用 5～10 小时数据训练带延迟 GAN 的 NHN 原型基模。
+
+common:
+  # auto 按 CUDA → Apple MPS → CPU 的顺序选择；正式训练优先 CUDA。
+  device: auto
+  # CUDA 上启用 float16 混合精度以降低显存占用。
+  amp: true
+  # macOS/首次运行使用 0 最稳；Linux 可尝试 2～4。
+  workers: 0
+  seed: 1234
+
+base_train:
+  # 普通或 BWE 统一预处理的输出目录；两者都可由训练器自动识别。
+  data: ../data/prototype_5_10h
+  # 本次验证使用独立目录，避免覆盖正式基模。
+  output: ../checkpoints/nhn-prototype-5-10h
+  validation_data: null
+  feature_stats: null
+  resume: null
+
+  # 5% 用于验证；另请在预处理前保留一份完全独立的试听测试集。
+  validation_split: 0.05
+
+  # 假设平均约 8 秒/文件：5～10 小时约产生 2250～4500 个文件，
+  # batch=1 时 12 epoch 约为 2.6万～5.1万 step。
+  epochs: 12
+  batch_size: 1
+  segment_seconds: 1.0
+
+  learning_rate: 0.0002
+  weight_decay: 0.0001
+
+  # 先用约 5000 step 学重建，再开启 MPD/MSD。
+  gan_start_step: 5000
+  # 原型验证先使用较温和的 GAN 权重，稳定后可提高到 1.0。
+  adversarial_weight: 0.5
+  feature_matching_weight: 2.0
+
+  save_every: 1000
+  log_every: 20
