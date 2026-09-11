@@ -54,6 +54,77 @@ cd vocoder
 uv sync --dev
 ```
 
+### PyTorch CPU 与 CUDA 版本
+
+`pyproject.toml` 中的普通 `torch` 依赖从默认 PyPI 索引解析。在 macOS 上得到的是
+CPU/MPS 版本；某些 Linux 环境也可能装到不符合训练机要求的版本。正式使用 NVIDIA GPU
+训练时，建议把 PyTorch 作为单独一步安装，不要仅依赖默认的 `uv sync`。
+
+当前项目推荐并已在 CPU 侧通过测试的版本是 **PyTorch 2.14.0**。近期 NVIDIA GPU
+优先使用官方 **CUDA 13.0** wheel：
+
+```bash
+cd /Users/ad/MineCode/MeloStudio/vocoder
+
+# 安装项目依赖，但先跳过默认索引中的 torch
+uv sync --all-extras --dev --no-install-package torch
+
+# 单独安装 PyTorch 2.14.0 + CUDA 13.0
+uv pip install --python .venv/bin/python --reinstall \
+  torch==2.14.0 \
+  --index-url https://download.pytorch.org/whl/cu130
+```
+
+CUDA 12.6 兼容方案：适合驱动暂时不能升级到 CUDA 13，或者仍需兼容较旧 NVIDIA
+架构的训练机。PyTorch 官方已说明 2.14 是最后提供 CUDA 12.x wheel 的版本：
+
+```bash
+uv pip install --python .venv/bin/python --reinstall \
+  torch==2.14.0 \
+  --index-url https://download.pytorch.org/whl/cu126
+```
+
+官方版本和 wheel 索引：
+
+- [PyTorch 2.14 发布说明](https://dev-discuss.pytorch.org/t/pytorch-2-14-0-general-availability/3431)
+- [PyTorch CUDA 13.0 wheels](https://download.pytorch.org/whl/cu130/torch/)
+- [PyTorch CUDA 12.6 wheels](https://download.pytorch.org/whl/cu126/torch/)
+- [PyTorch 官方安装选择器](https://pytorch.org/get-started/locally/)
+
+安装后必须验证，不能只看 `nvidia-smi`：
+
+```bash
+uv run --no-sync python -c "import torch; \
+print('torch:', torch.__version__); \
+print('wheel CUDA:', torch.version.cuda); \
+print('CUDA available:', torch.cuda.is_available()); \
+print('GPU:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'NONE')"
+```
+
+正确的 NVIDIA 训练环境应满足：
+
+- `torch` 显示 `2.14.0+cu130` 或 `2.14.0+cu126`；
+- `wheel CUDA` 不是 `None`；
+- `CUDA available` 是 `True`；
+- `GPU` 显示实际显卡名称。
+
+因为 CUDA wheel 是在锁文件之外单独覆盖安装的，之后运行命令建议加 `--no-sync`，避免
+`uv` 再次按照默认锁文件换回 CPU wheel：
+
+```bash
+uv run --no-sync nhn-vocoder train --config configs/nhn-prototype-5-10h.yaml
+```
+
+也可以激活环境后直接运行，这样不触发 `uv run` 的同步检查：
+
+```bash
+source .venv/bin/activate
+nhn-vocoder train --config configs/nhn-prototype-5-10h.yaml
+```
+
+macOS 没有 CUDA wheel；本机显示 `torch.version.cuda == None` 是正常的，应使用 MPS/CPU
+做开发验证，正式 CUDA 训练放到 Linux 或 Windows NVIDIA 机器执行。
+
 代码按职责组织，`entrypoints/` 只保留四个面向用户的流程入口：
 
 ```text

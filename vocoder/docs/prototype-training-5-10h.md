@@ -4,6 +4,8 @@
 checkpoint、推理和导出链路。它比冒烟测试更有意义，但仍不等同于正式成品训练。
 
 对应配置：[nhn-prototype-5-10h.yaml](../configs/nhn-prototype-5-10h.yaml)。
+NVIDIA 训练机应先按 [README 的 PyTorch CPU 与 CUDA 版本说明](../README.md#pytorch-cpu-与-cuda-版本)
+单独安装 CUDA wheel；下面命令使用 `--no-sync`，避免重新同步成默认 CPU wheel。
 
 ## 数据建议
 
@@ -20,14 +22,14 @@ checkpoint、推理和导出链路。它比冒烟测试更有意义，但仍不�
 ```bash
 cd /Users/ad/MineCode/MeloStudio/vocoder
 
-uv run nhn-vocoder preprocess raw_wavs data/prototype_5_10h \
+uv run --no-sync nhn-vocoder preprocess raw_wavs data/prototype_5_10h \
   --f0-backend fcpe --f0-device cuda
 ```
 
 如果本次验证目标是低采样率输入、固定输出 48 kHz，则使用 BWE 预处理：
 
 ```bash
-uv run nhn-vocoder preprocess --pipeline bwe masters_48k data/prototype_5_10h \
+uv run --no-sync nhn-vocoder preprocess --pipeline bwe masters_48k data/prototype_5_10h \
   --source-sample-rates 16000,24000,32000,48000 \
   --f0-backend fcpe --f0-device cuda
 ```
@@ -37,7 +39,7 @@ uv run nhn-vocoder preprocess --pipeline bwe masters_48k data/prototype_5_10h \
 ## 训练
 
 ```bash
-uv run nhn-vocoder train --config configs/nhn-prototype-5-10h.yaml
+uv run --no-sync nhn-vocoder train --config configs/nhn-prototype-5-10h.yaml
 ```
 
 配置默认行为：
