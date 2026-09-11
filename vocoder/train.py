@@ -22,6 +22,12 @@ from .discriminators import (
 from .losses import NHNVocoderLoss
 from .model import NHNVocoder
 from .stats import load_feature_range
+from .training_config import (
+    detect_training_section,
+    parse_training_args,
+    require_configured_paths,
+    resolve_training_device,
+)
 
 
 def _checkpoint_paths(output: Path) -> Tuple[Path, Path, Path]:
@@ -111,8 +117,9 @@ def _evaluate(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Train the compact NHN LLSM vocoder")
-    parser.add_argument("data", type=Path, help="directory of matching name.npy/name.wav pairs")
-    parser.add_argument("output", type=Path, help="checkpoint file or output directory")
+    parser.add_argument("data", type=Path, nargs="?", help="directory of matching name.npy/name.wav pairs")
+    parser.add_argument("output", type=Path, nargs="?", help="checkpoint file or output directory")
+    parser.add_argument("--config", type=Path, help="nhn_base_train YAML configuration")
     parser.add_argument("--validation-data", type=Path, help="separate validation directory")
     parser.add_argument("--validation-split", type=float, default=0.05)
     parser.add_argument("--feature-stats", type=Path, help="feature_stats.npz made by nhn-stats")
@@ -134,8 +141,16 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main() -> None:
-    args = build_parser().parse_args()
+def main(argv: list[str] | None = None) -> None:
+    if detect_training_section(argv) == "post_train":
+        from .post_train import main as post_train_main
+
+        post_train_main(argv)
+        return
+    parser = build_parser()
+    args = parse_training_args(parser, "base_train", argv)
+    require_configured_paths(parser, args, ("data", "output"))
+    args.device = resolve_training_device(args.device)
     if not 0 <= args.validation_split < 1:
         raise ValueError("validation_split must be in [0, 1)")
     if args.segment_seconds <= 0 or args.batch_size <= 0:

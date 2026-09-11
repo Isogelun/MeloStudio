@@ -1,3 +1,4 @@
+# NHN vocoder project lockfile.
 version = 1
 revision = 3
 requires-python = "==3.12.*"
@@ -481,6 +482,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "numpy" },
+    { name = "pyyaml" },
     { name = "scipy" },
     { name = "soundfile" },
     { name = "tensorboard" },
@@ -513,6 +515,7 @@ requires-dist = [
     { name = "onnxruntime", marker = "extra == 'export'", specifier = ">=1.20" },
     { name = "praat-parselmouth", marker = "extra == 'analysis'", specifier = ">=0.4.6" },
     { name = "pyllsm2", marker = "extra == 'analysis'", specifier = "==0.2.0" },
+    { name = "pyyaml", specifier = ">=6.0" },
     { name = "rmvpe-onnx", marker = "extra == 'rmvpe'", specifier = ">=0.2.3" },
     { name = "scipy", specifier = ">=1.14" },
     { name = "soundfile", specifier = ">=0.12" },

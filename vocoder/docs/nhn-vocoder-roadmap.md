@@ -1,4 +1,4 @@
-# NHN vocoder 完善路线
+# NHN Vocoder 完善路线
 
 ## 当前定位
 
@@ -116,7 +116,7 @@ BWE 输出采用 `features/name@采样率.npy`、共享的 `targets/name.wav` �
 
 ```bash
 # NPY/NPZ 或任意 <=48 kHz 的 WAV/FLAC，固定输出 48 kHz mono WAV
-uv run nhn-synthesize input.wav checkpoints/bwe/best.pt output.wav \
+uv run nhn-synthesize input.wav checkpoints/bwe/best.pt outputs/output.wav \
   --device cpu --f0-backend fcpe --chunk-frames 750 --overlap-frames 32
 
 # 去掉 optimizer、scheduler、scaler 和判别器，只保留推理权重

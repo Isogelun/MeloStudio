@@ -13,6 +13,11 @@ from .checkpoint import load_checkpoint
 from .data import LLSMWavDataset
 from .dsp import DSPConfig, DSPControlPredictor, DifferentiableDSP
 from .losses import NHNVocoderLoss
+from .training_config import (
+    parse_training_args,
+    require_configured_paths,
+    resolve_training_device,
+)
 
 
 def save_post_training_checkpoint(
@@ -48,9 +53,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Post-train a small DSP control head with the NHN base frozen"
     )
-    parser.add_argument("data", type=Path, help="existing paired LLSM72/WAV dataset")
-    parser.add_argument("base_checkpoint", type=Path)
-    parser.add_argument("output", type=Path, help="output directory or .pt path")
+    parser.add_argument("data", type=Path, nargs="?", help="existing paired LLSM72/WAV dataset")
+    parser.add_argument("base_checkpoint", type=Path, nargs="?")
+    parser.add_argument("output", type=Path, nargs="?", help="output directory or .pt path")
+    parser.add_argument("--config", type=Path, help="nhn_dsp_post_train YAML configuration")
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--segment-seconds", type=float, default=2.0)
@@ -66,8 +72,11 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main() -> None:
-    args = build_parser().parse_args()
+def main(argv: list[str] | None = None) -> None:
+    parser = build_parser()
+    args = parse_training_args(parser, "post_train", argv)
+    require_configured_paths(parser, args, ("data", "base_checkpoint", "output"))
+    args.device = resolve_training_device(args.device)
     if args.epochs < 1 or args.batch_size < 1 or args.segment_seconds <= 0:
         raise ValueError("epochs, batch-size and segment-seconds must be positive")
     random.seed(args.seed)

@@ -22,10 +22,28 @@
 
 ## 使用
 
-项目使用 Python 3.12 和 uv。在仓库根目录同步基础训练环境：
+项目使用 Python 3.12 和 uv。先进入 `vocoder/` 项目目录；目录内的 `.venv`
+符号链接会复用仓库根目录现有的 Python 3.12 环境：
 
 ```bash
+cd vocoder
 uv sync --dev
+```
+
+训练配置按职责拆为两个文件：[基模配置](configs/nhn-base.yaml) 声明
+`config_type: nhn_base_train`，[DSP 后训练配置](configs/nhn-dsp-post.yaml) 声明
+`config_type: nhn_dsp_post_train`。加载器会核对类型，防止两个训练阶段误用配置；文件内
+的相对路径以 YAML 所在目录为基准。训练命令为：
+
+```bash
+uv run nhn-train --config configs/nhn-base.yaml
+uv run nhn-train --config configs/nhn-dsp-post.yaml
+```
+
+命令行参数优先于 YAML，因此临时降低显存占用无需改文件：
+
+```bash
+uv run nhn-train --config configs/nhn-base.yaml --batch-size 1 --segment-seconds 1
 ```
 
 分析 WAV 还需要 pyllsm2 和外部 F0 分析器：
@@ -135,15 +153,16 @@ uv run nhn-train data/train checkpoints/run1 \
 ```
 
 CUDA 训练可添加 `--device cuda --amp`；禁用混合精度使用 `--no-amp`。没有独立
-验证目录时，默认固定抽取 5% 文件作为验证集，也可用 `--validation-data data/valid`。
+验证目录时，默认固定抽取 5% 文件作为验证集，也可用
+`--validation-data data/valid`。
 
 推理。旧入口继续支持 NPY；统一入口还支持 NPZ、字段 mapping 的 SDK 调用，以及
 WAV/FLAC 音频分析。音频输入允许不高于 48 kHz，输出始终取 checkpoint 的 48 kHz：
 
 ```bash
-uv run nhn-infer example.npy checkpoints/run1/best.pt output.wav --device cpu
+uv run nhn-infer example.npy checkpoints/run1/best.pt outputs/output.wav --device cpu
 
-uv run nhn-synthesize input_16k.wav checkpoints/bwe1/best.pt output_48k.wav \
+uv run nhn-synthesize input_16k.wav checkpoints/bwe1/best.pt outputs/output_48k.wav \
   --device cpu --f0-backend fcpe --chunk-frames 750 --overlap-frames 32
 ```
 
@@ -175,7 +194,7 @@ uv run nhn-benchmark deploy/inference.pt --seconds 2 --runs 10 --device cpu
 TorchScript 可接收不同帧数。当前 ONNX 导出固定 `batch=1` 和 `--frames` 指定的长度；
 长音频使用 SDK 分块。float16/bfloat16/int8 是否可用由基准程序按目标设备和算子组合
 实际检测，不支持时会明确报告。完整接口边界见
-[输入扩展与 SDK 规划](../docs/vocoder-input-sdk-plan.md)。
+[输入扩展与 SDK 规划](docs/vocoder-input-sdk-plan.md)。
 
 ## P5 DSP 控制与后训练
 
@@ -183,13 +202,18 @@ SDK 现在支持在稳定 LLSM72 基模之上添加帧级 DSP 控制，并可冻
 自动控制头：
 
 ```bash
-uv run nhn-post-train data/train checkpoints/run1/best.pt checkpoints/dsp-post \
-  --epochs 20 --batch-size 8 --device cuda --amp
+uv run nhn-train --config configs/nhn-dsp-post.yaml
+```
+
+使用统一配置时只需：
+
+```bash
+uv run nhn-train --config configs/nhn-dsp-post.yaml
 ```
 
 普通 checkpoint 默认完全旁路 DSP；后训练 checkpoint 会自动加载控制头；上层也可用
 `SynthesisRequest` 显式提供控制。设计、范围和 SDK 示例见
-[P5 DSP 与上层后训练](../docs/p5-dsp-post-training.md)。
+[P5 DSP 与上层后训练](docs/p5-dsp-post-training.md)。
 
 ## 性能说明
 

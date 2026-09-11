@@ -9,8 +9,9 @@ from vocoder.audio import write_wav
 from vocoder.config import NHNVocoderConfig
 from vocoder.dsp import DSPConfig, DSPControlPredictor, DifferentiableDSP
 from vocoder.model import NHNVocoder
-from vocoder.post_train import main as post_train_main, save_post_training_checkpoint
+from vocoder.post_train import save_post_training_checkpoint
 from vocoder.sdk import DSPControl, FeatureValueError, SynthesisRequest, VocoderSession
+from vocoder.train import main as train_main
 
 
 def _config():
@@ -107,12 +108,29 @@ def test_post_training_cli_writes_loadable_checkpoint(tmp_path, monkeypatch):
     base_path = tmp_path / "base.pt"
     save_checkpoint(base_path, NHNVocoder(_config()))
     output = tmp_path / "post"
+    config = tmp_path / "post.yaml"
+    config.write_text(
+        f"""
+config_type: nhn_dsp_post_train
+description: Exercise unified DSP post-training dispatch.
+common:
+  device: cpu
+  amp: false
+post_train:
+  data: {data.name}
+  base_checkpoint: {base_path.name}
+  output: {output.name}
+  epochs: 1
+  batch_size: 1
+  segment_seconds: 0.0426667
+  log_every: 1
+""".strip(),
+        encoding="utf-8",
+    )
     monkeypatch.setattr(sys, "argv", [
-        "nhn-post-train", str(data), str(base_path), str(output),
-        "--epochs", "1", "--batch-size", "1", "--segment-seconds", "0.0426667",
-        "--device", "cpu", "--no-amp", "--log-every", "1",
+        "nhn-train", "--config", str(config),
     ])
-    post_train_main()
+    train_main()
     checkpoint = output / "latest.pt"
     assert checkpoint.is_file()
     assert VocoderSession.from_checkpoint(checkpoint).dsp_predictor is not None

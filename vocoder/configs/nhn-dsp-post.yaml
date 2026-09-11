@@ -1,0 +1,24 @@
+# This file freezes the trained NHN base and trains only the small DSP control head.
+config_type: nhn_dsp_post_train
+description: Post-train automatic gain, tilt, breath, transient, de-esser and limiter controls.
+
+common:
+  # auto selects CUDA, then Apple MPS, then CPU. CLI values can override this.
+  device: auto
+  amp: true
+  workers: 0
+  seed: 1234
+
+post_train:
+  # Relative paths stay inside this project: data/ and checkpoints/.
+  data: ../data/bwe_train
+  base_checkpoint: ../checkpoints/nhn-base/best.pt
+  output: ../checkpoints/nhn-dsp
+  epochs: 20
+  batch_size: 2
+  segment_seconds: 2.0
+  learning_rate: 0.0001
+  control_regularization: 0.001
+  hidden_channels: 64
+  save_every: 1000
+  log_every: 20

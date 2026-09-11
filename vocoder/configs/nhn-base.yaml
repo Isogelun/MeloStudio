@@ -1,0 +1,29 @@
+# This file trains the full NHN vocoder base model: LLSM72 -> 48 kHz waveform.
+config_type: nhn_base_train
+description: Train the NHN base vocoder, including reconstruction and GAN stages.
+
+common:
+  # auto selects CUDA, then Apple MPS, then CPU. CLI values can override this.
+  device: auto
+  amp: true
+  workers: 0
+  seed: 1234
+
+base_train:
+  # Relative paths stay inside this project: data/ and checkpoints/.
+  data: ../data/bwe_train
+  output: ../checkpoints/nhn-base
+  validation_data: null
+  feature_stats: null
+  resume: null
+  validation_split: 0.05
+  epochs: 200
+  batch_size: 2
+  segment_seconds: 2.0
+  learning_rate: 0.0002
+  weight_decay: 0.0001
+  gan_start_step: 10000
+  adversarial_weight: 1.0
+  feature_matching_weight: 2.0
+  save_every: 1000
+  log_every: 20

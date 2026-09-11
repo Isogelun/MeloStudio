@@ -1,4 +1,4 @@
-# P5：DSP 控制层与上层后训练
+# P5：DSP 控制层与上层后训练方案
 
 ## 当前定位
 
@@ -67,9 +67,17 @@ result.save("output_48k.wav")
 后训练直接复用 P1/P3 的配对数据，不需要重新预处理：
 
 ```bash
-uv run nhn-post-train data/train checkpoints/base/best.pt checkpoints/dsp-post \
-  --epochs 20 --batch-size 8 --device cuda --amp
+uv run nhn-train --config configs/nhn-dsp-post.yaml
 ```
+
+两个阶段使用不同配置，文件头分别声明用途和 `config_type`，随后执行：
+
+```bash
+uv run nhn-train --config configs/nhn-base.yaml
+uv run nhn-train --config configs/nhn-dsp-post.yaml
+```
+
+CLI 显式参数会覆盖 YAML；例如显存不足时追加 `--batch-size 1`。
 
 训练期间：
 
@@ -82,7 +90,7 @@ uv run nhn-post-train data/train checkpoints/base/best.pt checkpoints/dsp-post \
 加载后无需改变调用代码：
 
 ```python
-session = VocoderSession.from_checkpoint("checkpoints/dsp-post/latest.pt")
+session = VocoderSession.from_checkpoint("checkpoints/nhn-dsp/latest.pt")
 result = session.synthesize(llsm72)  # 自动使用预测的 DSP 控制
 ```
 

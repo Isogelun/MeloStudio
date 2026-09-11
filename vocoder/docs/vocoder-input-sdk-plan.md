@@ -1,4 +1,4 @@
-# NHN vocoder 输入扩展与 SDK 规划
+# NHN Vocoder 输入扩展与 SDK 规划
 
 ## 目标与边界
 
