@@ -6,7 +6,7 @@ from pathlib import Path
 import torch
 from torch import Tensor, nn
 
-from .checkpoint import load_checkpoint
+from ..training.checkpoint import load_checkpoint
 
 
 class InferenceWrapper(nn.Module):

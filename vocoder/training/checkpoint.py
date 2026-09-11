@@ -6,8 +6,8 @@ from typing import Any, Dict, Optional
 
 import torch
 
-from .config import NHNVocoderConfig
-from .model import NHNVocoder
+from ..core.config import NHNVocoderConfig
+from ..core.model import NHNVocoder
 
 
 def _upgrade_model_state(payload: Dict[str, Any], model: NHNVocoder) -> Dict[str, Any]:

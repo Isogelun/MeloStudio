@@ -4,14 +4,14 @@ import numpy as np
 import pytest
 import torch
 
-from vocoder.checkpoint import save_checkpoint
-from vocoder.audio import write_wav
-from vocoder.config import NHNVocoderConfig
-from vocoder.dsp import DSPConfig, DSPControlPredictor, DifferentiableDSP
-from vocoder.model import NHNVocoder
-from vocoder.post_train import save_post_training_checkpoint
+from vocoder.core.config import NHNVocoderConfig
+from vocoder.core.dsp import DSPConfig, DSPControlPredictor, DifferentiableDSP
+from vocoder.core.model import NHNVocoder
+from vocoder.preprocessing.audio import write_wav
+from vocoder.training.checkpoint import save_checkpoint
+from vocoder.training.post_train import save_post_training_checkpoint
 from vocoder.sdk import DSPControl, FeatureValueError, SynthesisRequest, VocoderSession
-from vocoder.train import main as train_main
+from vocoder.training.train import main as train_main
 
 
 def _config():

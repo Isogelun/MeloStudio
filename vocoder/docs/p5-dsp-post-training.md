@@ -67,14 +67,14 @@ result.save("output_48k.wav")
 后训练直接复用 P1/P3 的配对数据，不需要重新预处理：
 
 ```bash
-uv run nhn-train --config configs/nhn-dsp-post.yaml
+uv run nhn-vocoder train --config configs/nhn-dsp-post.yaml
 ```
 
 两个阶段使用不同配置，文件头分别声明用途和 `config_type`，随后执行：
 
 ```bash
-uv run nhn-train --config configs/nhn-base.yaml
-uv run nhn-train --config configs/nhn-dsp-post.yaml
+uv run nhn-vocoder train --config configs/nhn-base.yaml
+uv run nhn-vocoder train --config configs/nhn-dsp-post.yaml
 ```
 
 CLI 显式参数会覆盖 YAML；例如显存不足时追加 `--batch-size 1`。

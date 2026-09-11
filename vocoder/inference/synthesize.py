@@ -4,8 +4,8 @@ import argparse
 import json
 from pathlib import Path
 
-from .audio import AUDIO_SUFFIXES
-from .sdk import VocoderSession
+from ..preprocessing.audio import AUDIO_SUFFIXES
+from ..sdk import VocoderSession
 
 
 def build_parser() -> argparse.ArgumentParser:

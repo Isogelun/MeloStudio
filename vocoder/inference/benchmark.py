@@ -10,8 +10,8 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from .checkpoint import load_checkpoint
-from .dsp import (
+from ..training.checkpoint import load_checkpoint
+from ..core.dsp import (
     DSPAugmentedVocoder,
     DSPConfig,
     DSPControlPredictor,

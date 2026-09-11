@@ -1,9 +1,9 @@
 import numpy as np
 import torch
 
-from vocoder.audio import write_wav
-from vocoder.data import LLSMWavDataset
-from vocoder.stats import compute_feature_stats, load_feature_range
+from vocoder.preprocessing.audio import write_wav
+from vocoder.preprocessing.stats import compute_feature_stats, load_feature_range
+from vocoder.training.data import LLSMWavDataset
 
 
 def test_dataset_center_crop_and_alignment(tmp_path):

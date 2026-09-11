@@ -5,8 +5,8 @@ from pathlib import Path
 
 import numpy as np
 
-from ..audio import write_wav
-from ..dsp import DSP_CONTROL_NAMES
+from ..core.dsp import DSP_CONTROL_NAMES
+from ..preprocessing.audio import write_wav
 from .errors import FeatureValueError, InvalidFeatureShape
 
 

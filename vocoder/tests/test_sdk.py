@@ -2,9 +2,9 @@ import numpy as np
 import pytest
 import torch
 
-from vocoder.checkpoint import save_checkpoint
-from vocoder.config import NHNVocoderConfig
-from vocoder.model import NHNVocoder
+from vocoder.core.config import NHNVocoderConfig
+from vocoder.core.model import NHNVocoder
+from vocoder.training.checkpoint import save_checkpoint
 from vocoder.sdk import DSPControl, FeatureConfigMismatch, LLSMFeatures, VocoderSession
 
 

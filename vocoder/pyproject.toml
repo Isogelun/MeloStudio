@@ -32,26 +32,40 @@ export = [
 ]
 
 [project.scripts]
-nhn-analyze = "vocoder.analyze:main"
-nhn-benchmark = "vocoder.benchmark:main"
-nhn-compare-f0 = "vocoder.compare_f0:main"
-nhn-export = "vocoder.export:main"
-nhn-infer = "vocoder.infer:main"
-nhn-preprocess = "vocoder.preprocess:main"
-nhn-preprocess-bwe = "vocoder.preprocess_bwe:main"
-nhn-stats = "vocoder.stats:main"
-nhn-synthesize = "vocoder.synthesize:main"
-nhn-train = "vocoder.train:main"
+nhn-vocoder = "vocoder.entrypoints.__main__:main"
+nhn-analyze = "vocoder.preprocessing.analyze:main"
+nhn-benchmark = "vocoder.inference.benchmark:main"
+nhn-compare-f0 = "vocoder.preprocessing.compare_f0:main"
+nhn-export = "vocoder.inference.export:main"
+nhn-infer = "vocoder.inference.infer:main"
+nhn-preprocess = "vocoder.preprocessing.preprocess:main"
+nhn-preprocess-bwe = "vocoder.preprocessing.preprocess_bwe:main"
+nhn-stats = "vocoder.preprocessing.stats:main"
+nhn-synthesize = "vocoder.inference.synthesize:main"
+nhn-train = "vocoder.training.train:main"
 
 [dependency-groups]
 dev = ["pytest>=8.3"]
 
 [tool.setuptools]
-packages = ["vocoder", "vocoder.sdk"]
+packages = [
+  "vocoder",
+  "vocoder.core",
+  "vocoder.entrypoints",
+  "vocoder.inference",
+  "vocoder.preprocessing",
+  "vocoder.sdk",
+  "vocoder.training",
+]
 
 [tool.setuptools.package-dir]
 vocoder = "."
+"vocoder.core" = "core"
+"vocoder.entrypoints" = "entrypoints"
+"vocoder.inference" = "inference"
+"vocoder.preprocessing" = "preprocessing"
 "vocoder.sdk" = "sdk"
+"vocoder.training" = "training"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

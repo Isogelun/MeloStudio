@@ -7,12 +7,12 @@ from typing import Iterable
 import numpy as np
 import torch
 
-from ..analyze import F0Extractor, analyze_waveform
-from ..audio import AUDIO_SUFFIXES, read_audio
-from ..checkpoint import load_checkpoint
-from ..dsp import DSPConfig, DSPControlPredictor, DifferentiableDSP
-from ..model import NHNVocoder
-from ..resample import resample_audio
+from ..core.dsp import DSPConfig, DSPControlPredictor, DifferentiableDSP
+from ..core.model import NHNVocoder
+from ..preprocessing.analyze import F0Extractor, analyze_waveform
+from ..preprocessing.audio import AUDIO_SUFFIXES, read_audio
+from ..preprocessing.resample import resample_audio
+from ..training.checkpoint import load_checkpoint
 from .adapters import FeatureAdapterRegistry, default_registry
 from .errors import FeatureConfigMismatch, FeatureValueError, UnsupportedInputType
 from .types import AudioResult, DSPControl, LLSMFeatures, SynthesisRequest

@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .sdk import VocoderSession
+from ..sdk import VocoderSession
 
 
 def build_parser() -> argparse.ArgumentParser:

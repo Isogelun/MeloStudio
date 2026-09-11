@@ -3,11 +3,11 @@ import json
 import numpy as np
 import soundfile as sf
 
-from vocoder.audio import read_audio, write_wav
-from vocoder.data import LLSMWavDataset
-from vocoder.preprocess_bwe import parse_sample_rates
-from vocoder.quality import analyze_quality
-from vocoder.resample import bandwidth_degrade, measure_roundtrip_delay, resample_audio
+from vocoder.preprocessing.audio import read_audio, write_wav
+from vocoder.preprocessing.preprocess_bwe import parse_sample_rates
+from vocoder.preprocessing.quality import analyze_quality
+from vocoder.preprocessing.resample import bandwidth_degrade, measure_roundtrip_delay, resample_audio
+from vocoder.training.data import LLSMWavDataset
 
 
 def test_audio_reads_24_bit_wav_and_flac(tmp_path):

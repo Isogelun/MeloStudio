@@ -87,10 +87,10 @@ Kaiser-window cosine-modulated 设计，并针对 16 子带采用更窄截止频
 
 ```bash
 # 普通数据：自动读取 WAV/FLAC 和任意原始采样率，统一生成 48 kHz 配对数据
-uv run nhn-preprocess raw_audio data/train --f0-backend fcpe
+uv run nhn-vocoder preprocess raw_audio data/train --f0-backend fcpe
 
 # 48 kHz 母带：生成多种来源带宽的 LLSM72，target 始终为原始 48 kHz
-uv run nhn-preprocess-bwe masters_48k data/bwe_train \
+uv run nhn-vocoder preprocess --pipeline bwe masters_48k data/bwe_train \
   --source-sample-rates 8000,12000,16000,22050,24000,32000,44100,48000
 
 # 数据集级 F0 后端对照
@@ -116,16 +116,16 @@ BWE 输出采用 `features/name@采样率.npy`、共享的 `targets/name.wav` �
 
 ```bash
 # NPY/NPZ 或任意 <=48 kHz 的 WAV/FLAC，固定输出 48 kHz mono WAV
-uv run nhn-synthesize input.wav checkpoints/bwe/best.pt outputs/output.wav \
+uv run nhn-vocoder infer input.wav checkpoints/bwe/best.pt outputs/output.wav \
   --device cpu --f0-backend fcpe --chunk-frames 750 --overlap-frames 32
 
 # 去掉 optimizer、scheduler、scaler 和判别器，只保留推理权重
-uv run nhn-export checkpoints/bwe/best.pt deploy/inference.pt \
+uv run nhn-vocoder export checkpoints/bwe/best.pt deploy/inference.pt \
   --format checkpoint
 
 # TorchScript 支持可变帧数；ONNX 当前固定 batch=1 和导出时的帧数
-uv run nhn-export deploy/inference.pt deploy/model.ts --format torchscript --frames 375
-uv run nhn-export deploy/inference.pt deploy/model.onnx --format onnx --frames 375
+uv run nhn-vocoder export deploy/inference.pt deploy/model.ts --format torchscript --frames 375
+uv run nhn-vocoder export deploy/inference.pt deploy/model.onnx --format onnx --frames 375
 
 # 在目标机器上测 RTF、p95 延迟、模型大小和峰值内存
 uv run nhn-benchmark deploy/inference.pt --seconds 2 --runs 10 \

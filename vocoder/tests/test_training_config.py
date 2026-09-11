@@ -2,9 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from vocoder.post_train import build_parser as build_post_parser
-from vocoder.train import build_parser as build_train_parser
-from vocoder.training_config import (
+from vocoder.training.post_train import build_parser as build_post_parser
+from vocoder.training.train import build_parser as build_train_parser
+from vocoder.training.config import (
     detect_training_section,
     parse_training_args,
     require_configured_paths,

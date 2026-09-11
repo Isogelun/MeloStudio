@@ -11,7 +11,7 @@ import torch
 from torch.utils.data import DataLoader, Subset
 
 from .checkpoint import load_training_checkpoint, save_checkpoint
-from .config import NHNVocoderConfig
+from ..core.config import NHNVocoderConfig
 from .data import LLSMWavDataset
 from .discriminators import (
     MultiPeriodScaleDiscriminator,
@@ -20,9 +20,9 @@ from .discriminators import (
     generator_adversarial_loss,
 )
 from .losses import NHNVocoderLoss
-from .model import NHNVocoder
-from .stats import load_feature_range
-from .training_config import (
+from ..core.model import NHNVocoder
+from ..preprocessing.stats import load_feature_range
+from .config import (
     detect_training_section,
     parse_training_args,
     require_configured_paths,

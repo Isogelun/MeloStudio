@@ -1,12 +1,12 @@
 import numpy as np
 import pytest
 
-from vocoder.benchmark import benchmark_checkpoint
-from vocoder.checkpoint import load_checkpoint, save_checkpoint
-from vocoder.config import NHNVocoderConfig
-from vocoder.dsp import DSPConfig, DSPControlPredictor
-from vocoder.model import NHNVocoder
-from vocoder.post_train import save_post_training_checkpoint
+from vocoder.core.config import NHNVocoderConfig
+from vocoder.core.dsp import DSPConfig, DSPControlPredictor
+from vocoder.core.model import NHNVocoder
+from vocoder.inference.benchmark import benchmark_checkpoint
+from vocoder.training.checkpoint import load_checkpoint, save_checkpoint
+from vocoder.training.post_train import save_post_training_checkpoint
 
 
 def _checkpoint(tmp_path):

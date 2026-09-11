@@ -9,7 +9,7 @@ import torch
 from torch import Tensor
 from torch.utils.data import Dataset
 
-from .audio import read_wav
+from ..preprocessing.audio import read_wav
 
 
 class LLSMWavDataset(Dataset[Tuple[Tensor, Tensor]]):

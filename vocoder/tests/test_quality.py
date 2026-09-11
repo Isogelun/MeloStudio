@@ -1,12 +1,12 @@
 import torch
 
-from vocoder.discriminators import (
+from vocoder.training.discriminators import (
     MultiPeriodScaleDiscriminator,
     discriminator_loss,
     feature_matching_loss,
     generator_adversarial_loss,
 )
-from vocoder.losses import NHNVocoderLoss
+from vocoder.training.losses import NHNVocoderLoss
 
 
 def test_composite_quality_loss_is_finite_and_differentiable():

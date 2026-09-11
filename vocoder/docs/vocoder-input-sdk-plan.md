@@ -264,7 +264,7 @@ WAV；上层应在 metadata 中声明原始带宽或原始采样率，让 SDK �
 统一预处理命令增加显式模式，而不是自动猜测：
 
 ```bash
-uv run nhn-preprocess-bwe raw_48k data/bwe_train \
+uv run nhn-vocoder preprocess --pipeline bwe raw_48k data/bwe_train \
   --source-sample-rates 8000,12000,16000,22050,24000,32000,44100,48000 \
   --analysis-sample-rate 48000 \
   --target-sample-rate 48000 \
@@ -417,17 +417,22 @@ L_total = L_base
 
 ```text
 vocoder/
+├── entrypoints/
+│   ├── preprocess.py       # 普通/BWE 数据预处理统一入口
+│   ├── train.py            # 基模/DSP 后训练统一入口
+│   ├── export.py           # 模型导出统一入口
+│   └── infer.py            # 特征/音频推理统一入口
+├── preprocessing/         # LLSM72、F0、音频和数据准备实现
+├── training/              # 数据集、损失、判别器和训练实现
+├── inference/             # 推理、导出和 benchmark 实现
+├── core/                  # NHN 模型、FIR/PQMF 和 DSP
 ├── sdk/
 │   ├── __init__.py
 │   ├── session.py          # VocoderSession
 │   ├── types.py            # LLSMFeatures / AudioResult / metadata
 │   ├── adapters.py         # NumPy/Torch/路径/mapping adapter registry
 │   └── errors.py           # 稳定公开异常
-├── preprocess_bwe.py       # 48 kHz 母带 → BWE 配对数据
-├── synthesize.py           # 统一特征/音频 CLI
-├── infer.py                # 兼容旧 NPY CLI，内部调用 SDK
-├── export.py               # 纯 checkpoint/TorchScript/ONNX
-└── benchmark.py            # dtype、RTF 与峰值内存基准
+└── configs/                # 两阶段训练 YAML
 ```
 
 核心模型 `NHNVocoder.forward(features)` 不接受路径、WAV 或采样率参数。所有外部输入在
@@ -438,21 +443,20 @@ vocoder/
 保留现有命令：
 
 ```bash
-uv run nhn-infer input.npy best.pt output.wav --device cpu
+uv run nhn-vocoder infer input.npy best.pt output.wav --device cpu
 ```
 
 已增加上层友好的统一入口：
 
 ```bash
 # 自动读取任意 <=48 kHz WAV，并固定输出 48 kHz
-uv run nhn-synthesize input.wav vocoder_bwe.pt output_48k.wav --device cpu
+uv run nhn-vocoder infer input.wav vocoder_bwe.pt output_48k.wav --device cpu
 
 # 显式数组格式
-uv run nhn-synthesize features.npz vocoder.pt output.wav \
-  --input-format llsm72
+uv run nhn-vocoder infer features.npz vocoder.pt output.wav
 
 # 执行完整推理诊断并输出 metadata，但不写 WAV 文件
-uv run nhn-synthesize input.wav vocoder_bwe.pt output.wav --validate-only
+uv run nhn-vocoder infer input.wav vocoder_bwe.pt output.wav --validate-only
 ```
 
 CLI 可以读取 WAV header 的原始采样率，但不能猜测裸 72 维数组的来源带宽；数组输入

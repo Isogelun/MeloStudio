@@ -1,6 +1,6 @@
 import numpy as np
 
-from vocoder.compare_f0 import compare_contours
+from vocoder.preprocessing.compare_f0 import compare_contours
 
 
 def test_compare_contours_reports_voicing_and_pitch_error():

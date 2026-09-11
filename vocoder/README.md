@@ -30,20 +30,43 @@ cd vocoder
 uv sync --dev
 ```
 
+代码按职责组织，`entrypoints/` 只保留四个面向用户的流程入口：
+
+```text
+vocoder/
+├── entrypoints/       # preprocess / train / export / infer
+├── preprocessing/    # 音频读取、F0/LLSM72、重采样、数据集预处理
+├── training/         # 数据集、损失、判别器、checkpoint、两阶段训练
+├── inference/        # 推理实现、模型导出、性能基准
+├── core/             # NHN 模型、卷积/FIR/PQMF、可微 DSP
+├── sdk/              # 上层 Python SDK
+├── configs/          # 基模与 DSP 后训练 YAML
+└── tests/
+```
+
+统一命令只有四个主流程：
+
+```bash
+uv run nhn-vocoder preprocess --help
+uv run nhn-vocoder train --help
+uv run nhn-vocoder export --help
+uv run nhn-vocoder infer --help
+```
+
 训练配置按职责拆为两个文件：[基模配置](configs/nhn-base.yaml) 声明
 `config_type: nhn_base_train`，[DSP 后训练配置](configs/nhn-dsp-post.yaml) 声明
 `config_type: nhn_dsp_post_train`。加载器会核对类型，防止两个训练阶段误用配置；文件内
 的相对路径以 YAML 所在目录为基准。训练命令为：
 
 ```bash
-uv run nhn-train --config configs/nhn-base.yaml
-uv run nhn-train --config configs/nhn-dsp-post.yaml
+uv run nhn-vocoder train --config configs/nhn-base.yaml
+uv run nhn-vocoder train --config configs/nhn-dsp-post.yaml
 ```
 
 命令行参数优先于 YAML，因此临时降低显存占用无需改文件：
 
 ```bash
-uv run nhn-train --config configs/nhn-base.yaml --batch-size 1 --segment-seconds 1
+uv run nhn-vocoder train --config configs/nhn-base.yaml --batch-size 1 --segment-seconds 1
 ```
 
 分析 WAV 还需要 pyllsm2 和外部 F0 分析器：
@@ -68,7 +91,7 @@ pyllsm2 自身不包含 F0 提取。本项目默认使用更适合歌声的 FCPE
 最后生成 `feature_stats.npz` 和 `preprocess_report.json`：
 
 ```bash
-uv run nhn-preprocess raw_wavs data/train --f0-backend fcpe --f0-device cpu
+uv run nhn-vocoder preprocess raw_wavs data/train --f0-backend fcpe --f0-device cpu
 ```
 
 支持中断后重跑：已经存在的 NPY 会跳过，但仍会重新汇总全部成功文件的统计信息。
@@ -77,15 +100,15 @@ uv run nhn-preprocess raw_wavs data/train --f0-backend fcpe --f0-device cpu
 下面的 `nhn-analyze` 和 `nhn-stats` 保留给需要单独调试某一步的场景：
 
 ```bash
-python -m vocoder.analyze data/train --sample-rate 48000 --hop-length 256
+uv run nhn-analyze data/train --sample-rate 48000 --hop-length 256
 ```
 
 选择 F0 后端：
 
 ```bash
-python -m vocoder.analyze data/train --f0-backend fcpe --f0-device cuda
-python -m vocoder.analyze data/train --f0-backend rmvpe
-python -m vocoder.analyze data/train --f0-backend parselmouth
+uv run nhn-analyze data/train --f0-backend fcpe --f0-device cuda
+uv run nhn-analyze data/train --f0-backend rmvpe
+uv run nhn-analyze data/train --f0-backend parselmouth
 ```
 
 - `fcpe`：默认，针对单声道歌声，速度快，对快速音高变化较友好。
@@ -96,8 +119,8 @@ python -m vocoder.analyze data/train --f0-backend parselmouth
 添加 `--overwrite`。单文件和独立输出目录也受支持：
 
 ```bash
-python -m vocoder.analyze input.wav --output input.npy
-python -m vocoder.analyze raw_wavs --output data/train
+uv run nhn-analyze input.wav --output input.npy
+uv run nhn-analyze raw_wavs --output data/train
 ```
 
 普通预处理支持 PCM/float WAV、FLAC、自动混为 mono，并会把非 48 kHz 输入自动重采样。
@@ -105,7 +128,7 @@ python -m vocoder.analyze raw_wavs --output data/train
 （48 kHz mono target）：
 
 ```bash
-uv run nhn-train data/train checkpoints/run1 \
+uv run nhn-vocoder train data/train checkpoints/run1 \
   --batch-size 8 --segment-seconds 2 --device cpu
 ```
 
@@ -113,11 +136,11 @@ uv run nhn-train data/train checkpoints/run1 \
 建立多采样率 BWE 数据集：
 
 ```bash
-uv run nhn-preprocess-bwe masters_48k data/bwe_train \
+uv run nhn-vocoder preprocess --pipeline bwe masters_48k data/bwe_train \
   --source-sample-rates 8000,12000,16000,22050,24000,32000,44100,48000 \
   --f0-backend fcpe --f0-device cpu
 
-uv run nhn-train data/bwe_train checkpoints/bwe1 --device cuda
+uv run nhn-vocoder train data/bwe_train checkpoints/bwe1 --device cuda
 ```
 
 该数据集的训练 target 始终为原始 48 kHz WAV；不同来源采样率只改变输入 LLSM。
@@ -134,7 +157,7 @@ uv run nhn-compare-f0 raw_audio reports/f0-comparison.json \
 step 开启轻量 HiFi-GAN 风格 MPD/MSD、LSGAN 和 feature matching：
 
 ```bash
-uv run nhn-train data/train checkpoints/run1 \
+uv run nhn-vocoder train data/train checkpoints/run1 \
   --gan-start-step 10000 --adversarial-weight 1 --feature-matching-weight 2
 ```
 
@@ -148,7 +171,7 @@ MPD/MSD 只参与训练，不会增加 `NHNVocoder` 的推理参数量。对很�
 断点续训：
 
 ```bash
-uv run nhn-train data/train checkpoints/run1 \
+uv run nhn-vocoder train data/train checkpoints/run1 \
   --resume checkpoints/run1/latest.pt --epochs 200
 ```
 
@@ -160,9 +183,9 @@ CUDA 训练可添加 `--device cuda --amp`；禁用混合精度使用 `--no-amp`
 WAV/FLAC 音频分析。音频输入允许不高于 48 kHz，输出始终取 checkpoint 的 48 kHz：
 
 ```bash
-uv run nhn-infer example.npy checkpoints/run1/best.pt outputs/output.wav --device cpu
+uv run nhn-vocoder infer example.npy checkpoints/run1/best.pt outputs/output.wav --device cpu
 
-uv run nhn-synthesize input_16k.wav checkpoints/bwe1/best.pt outputs/output_48k.wav \
+uv run nhn-vocoder infer input_16k.wav checkpoints/bwe1/best.pt outputs/output_48k.wav \
   --device cpu --f0-backend fcpe --chunk-frames 750 --overlap-frames 32
 ```
 
@@ -185,9 +208,9 @@ audio = session.synthesize_waveform("input_16k.wav", f0_backend="fcpe")
 
 ```bash
 uv sync --extra export
-uv run nhn-export checkpoints/bwe1/best.pt deploy/inference.pt --format checkpoint
-uv run nhn-export deploy/inference.pt deploy/model.ts --format torchscript --frames 375
-uv run nhn-export deploy/inference.pt deploy/model.onnx --format onnx --frames 375
+uv run nhn-vocoder export checkpoints/bwe1/best.pt deploy/inference.pt --format checkpoint
+uv run nhn-vocoder export deploy/inference.pt deploy/model.ts --format torchscript --frames 375
+uv run nhn-vocoder export deploy/inference.pt deploy/model.onnx --format onnx --frames 375
 uv run nhn-benchmark deploy/inference.pt --seconds 2 --runs 10 --device cpu
 ```
 
@@ -202,13 +225,13 @@ SDK 现在支持在稳定 LLSM72 基模之上添加帧级 DSP 控制，并可冻
 自动控制头：
 
 ```bash
-uv run nhn-train --config configs/nhn-dsp-post.yaml
+uv run nhn-vocoder train --config configs/nhn-dsp-post.yaml
 ```
 
 使用统一配置时只需：
 
 ```bash
-uv run nhn-train --config configs/nhn-dsp-post.yaml
+uv run nhn-vocoder train --config configs/nhn-dsp-post.yaml
 ```
 
 普通 checkpoint 默认完全旁路 DSP；后训练 checkpoint 会自动加载控制头；上层也可用

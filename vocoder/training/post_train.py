@@ -11,9 +11,9 @@ from torch.utils.data import DataLoader
 
 from .checkpoint import load_checkpoint
 from .data import LLSMWavDataset
-from .dsp import DSPConfig, DSPControlPredictor, DifferentiableDSP
+from ..core.dsp import DSPConfig, DSPControlPredictor, DifferentiableDSP
 from .losses import NHNVocoderLoss
-from .training_config import (
+from .config import (
     parse_training_args,
     require_configured_paths,
     resolve_training_device,
