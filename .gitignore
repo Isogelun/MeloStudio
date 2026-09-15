@@ -1,2 +1,6 @@
 .venv/
 .DS_Store
+.idea/
+cmake-build-*/
+out/
+CMakeUserPresets.json
