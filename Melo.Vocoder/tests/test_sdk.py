@@ -2,10 +2,10 @@ import numpy as np
 import pytest
 import torch
 
-from vocoder.core.config import NHNVocoderConfig
-from vocoder.core.model import NHNVocoder
-from vocoder.training.checkpoint import save_checkpoint
-from vocoder.sdk import DSPControl, FeatureConfigMismatch, LLSMFeatures, VocoderSession
+from melo.vocoder.core.config import NHNVocoderConfig
+from melo.vocoder.core.model import NHNVocoder
+from melo.vocoder.training.checkpoint import save_checkpoint
+from melo.vocoder.sdk import DSPControl, FeatureConfigMismatch, LLSMFeatures, VocoderSession
 
 
 def _session(tmp_path):

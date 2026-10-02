@@ -8,10 +8,10 @@ from collections.abc import Sequence
 
 
 COMMANDS = {
-    "preprocess": ("vocoder.entrypoints.preprocess", "Prepare training data"),
-    "train": ("vocoder.entrypoints.train", "Run base or DSP post-training"),
-    "export": ("vocoder.entrypoints.export", "Export an inference model"),
-    "infer": ("vocoder.entrypoints.infer", "Run high-level inference"),
+    "preprocess": ("melo.vocoder.entrypoints.preprocess", "Prepare training data"),
+    "train": ("melo.vocoder.entrypoints.train", "Run base or DSP post-training"),
+    "export": ("melo.vocoder.entrypoints.export", "Export an inference model"),
+    "infer": ("melo.vocoder.entrypoints.infer", "Run high-level inference"),
 }
 
 

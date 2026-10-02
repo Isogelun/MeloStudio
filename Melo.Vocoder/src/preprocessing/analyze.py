@@ -31,7 +31,7 @@ def extract_f0_parselmouth(
     except ImportError as error:
         raise RuntimeError(
             "F0 extraction needs praat-parselmouth; install "
-            "vocoder/requirements-analysis.txt"
+            "Melo.Vocoder/requirements-analysis.txt"
         ) from error
 
     left_padding = int(np.ceil(1.5 / f0_min * sample_rate))
@@ -71,7 +71,7 @@ def extract_f0_fcpe(
     except ImportError as error:
         raise RuntimeError(
             "FCPE extraction needs torch and torchfcpe; install "
-            "vocoder/requirements-analysis.txt"
+            "Melo.Vocoder/requirements-analysis.txt"
         ) from error
     audio = torch.from_numpy(waveform).float().view(1, -1, 1).to(device)
     model = model or spawn_bundled_infer_model(device=device)
@@ -112,7 +112,7 @@ def extract_f0_rmvpe(
         )
         raise RuntimeError(
             "RMVPE extraction needs rmvpe-onnx; install "
-            f"vocoder/requirements-analysis.txt.{version_note}"
+            f"Melo.Vocoder/requirements-analysis.txt.{version_note}"
         ) from error
     model = model or RMVPE()
     times, frequency, confidence, _ = model.predict(audio=waveform, sr=sample_rate)
@@ -238,7 +238,7 @@ def analyze_waveform(
     except ImportError as error:
         raise RuntimeError(
             "LLSM analysis needs pyllsm2; install "
-            "vocoder/requirements-analysis.txt"
+            "Melo.Vocoder/requirements-analysis.txt"
         ) from error
 
     waveform = np.ascontiguousarray(np.asarray(waveform, dtype=np.float32).reshape(-1))

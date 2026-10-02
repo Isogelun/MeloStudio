@@ -37,7 +37,7 @@ SynthesisRequest(features, DSPControl)
 
 ```python
 import numpy as np
-from vocoder import DSPControl, SynthesisRequest, VocoderSession
+from melo.vocoder import DSPControl, SynthesisRequest, VocoderSession
 
 session = VocoderSession.from_checkpoint("checkpoints/base/best.pt", device="cpu")
 controls = DSPControl(

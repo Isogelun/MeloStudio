@@ -1,8 +1,8 @@
 # MeloStudio 核心层架构设计
 
-> 状态：设计提案，尚未实现。基于本目录 v3 文档、架构决策图和仓库现有 `vocoder/sdk` 整理。
+> 状态：设计提案，尚未实现。基于本目录 v3 文档、架构决策图和仓库现有 `Melo.Vocoder/src/sdk` 整理。
 > 本文把原图中的“核心进程”展开为模块、线程、数据所有权与实现顺序；保留独立进程与共享协议内核两个前提。
-> 现有 `core/` 只有设计资料。下文目录、消息和类型均为拟议结构，不表示已经存在对应代码。
+> 现有 `Melo.Core/` 包含基础类型、版本信息和构建测试脚手架。下文目录、消息和类型均为拟议结构，不表示已经存在对应代码。
 
 ## 1. 总体决定
 
@@ -18,7 +18,7 @@
 | 谁管理音频设备 | 核心进程的 `AudioEngine`；具体是否使用设备独占模式由设备后端配置决定 |
 | 核心怎么启动 | 第一版由 UI 拉起，可用同一可执行文件以 headless 模式启动；不先做常驻守护服务 |
 | 如何支持其他客户端 | UI、CLI 和插件复用协议封装，按能力授予不同权限 |
-| 如何接现有声码器 | 在独立 Python 工作进程内封装 `vocoder/sdk`，任意核心实现通过插件协议调用 |
+| 如何接现有声码器 | 在独立 Python 工作进程内封装 `Melo.Vocoder/src/sdk`，任意核心实现通过插件协议调用 |
 | 如何尝试多种语言 | 各语言实现同一核心契约，由一致性测试和基准验证；客户端按实现 ID 启动或连接 |
 | 如何保持第一版可控 | 一个核心进程先承载一个已打开项目；允许多客户端连接，编辑写入串行化 |
 
@@ -319,16 +319,16 @@ Seek、循环边界或计划切换带新的 `TransportGeneration`，缓冲中的
 
 ## 8. 现有 vocoder 的接入方式
 
-仓库根目录的 `core/` 是编辑器核心；[`vocoder/core/`](../../vocoder/core/) 是声码器神经网络实现，两者不能因名称相同而合并。训练、预处理、PyTorch/GPU 状态继续留在声码器项目内。
+仓库根目录的 `Melo.Core/` 是编辑器核心；[`Melo.Vocoder/src/core/`](../../Melo.Vocoder/src/core/) 是声码器神经网络实现，两者不能因名称相同而合并。训练、预处理、PyTorch/GPU 状态继续留在声码器项目内。
 
 ### 8.1 现有能力与缺口
 
 | 代码依据 | 已有能力 | 接入时新增的工作 |
 | --- | --- | --- |
-| [`sdk/types.py`](../../vocoder/sdk/types.py) | `LLSMFeatures`、`DSPControl`、`SynthesisRequest`、`AudioResult` | 共享内存格式与 Python 类型的转换、缓冲所有权约束 |
-| [`sdk/session.py`](../../vocoder/sdk/session.py) | 加载模型并复用会话，普通/分块合成、音频分析入口 | 工作进程封装、任务协议、进度、取消与异常映射 |
-| [`core/config.py`](../../vocoder/core/config.py) | 默认 48 kHz、hop=256，配置携带模型参数 | 启动时读取真实 checkpoint 能力，不把默认值写死在核心 |
-| [`sdk/session.py`](../../vocoder/sdk/session.py) 的 `synthesize_chunked` | 重叠分块计算后返回整段 `AudioResult` | 第一版按整段结果交付；真正逐块流式输出需要扩展 SDK |
+| [`sdk/types.py`](../../Melo.Vocoder/src/sdk/types.py) | `LLSMFeatures`、`DSPControl`、`SynthesisRequest`、`AudioResult` | 共享内存格式与 Python 类型的转换、缓冲所有权约束 |
+| [`sdk/session.py`](../../Melo.Vocoder/src/sdk/session.py) | 加载模型并复用会话，普通/分块合成、音频分析入口 | 工作进程封装、任务协议、进度、取消与异常映射 |
+| [`core/config.py`](../../Melo.Vocoder/src/core/config.py) | 默认 48 kHz、hop=256，配置携带模型参数 | 启动时读取真实 checkpoint 能力，不把默认值写死在核心 |
+| [`sdk/session.py`](../../Melo.Vocoder/src/sdk/session.py) 的 `synthesize_chunked` | 重叠分块计算后返回整段 `AudioResult` | 第一版按整段结果交付；真正逐块流式输出需要扩展 SDK |
 
 建议先新增一个受宿主管理的 Python 适配进程，调用 `VocoderSession.from_checkpoint()` 后复用模型，不把 Python 运行时嵌入任何一个核心实现。Python 共享环不能靠普通 NumPy 字段赋值实现同步，需经验证的原生桥接或通道库；模型输入输出适配可以有拷贝，不承诺当前 SDK 是零拷贝接口。
 
@@ -376,7 +376,7 @@ SDK 的 DSP 控制属于合成输入，会改变产物缓存键；播放器的�
 规范、测试夹具与具体实现分开存放。模块名表达逻辑职责，不映射到某种语言特有的包机制：
 
 ```text
-core/
+Melo.Core/
 ├── spec/                              实现无关的契约源
 │   ├── protocol/                      JSON schema / 二进制布局 / 版本规则
 │   ├── project-format/                工程格式与迁移规则
@@ -397,7 +397,7 @@ core/
 └── docs/
 
 plugins/nhn-vocoder-worker/             后续新增；核心目录之外的 Python 适配器
-vocoder/                               保留现有训练、推理与 SDK 工程
+Melo.Vocoder/                          保留现有训练、推理与 SDK 工程
 ```
 
 每个语言目录都实现第 3 节的逻辑模块：`domain`、`application`、`evaluation`、`presentation`、`scheduler`、`synthesis`、`assets`、`audio` 和外围适配器。目录与包的具体拆法由语言实现自行决定，但依赖方向和公共行为必须一致。
@@ -458,6 +458,6 @@ vocoder/                               保留现有训练、推理与 SDK 工程
 - [`v3-architecture-decision.md`](v3-architecture-decision.md)：进程边界、语言与协议内核的决策背景。
 - [`v3-render-protocol-design.md`](v3-render-protocol-design.md)：视口、图层、脏区与版本机制的初稿。
 - [`v3-架构决策图.png`](v3-架构决策图.png)：本次展开的三类进程和核心引擎划分。
-- [`vocoder/sdk/types.py`](../../vocoder/sdk/types.py)、[`vocoder/sdk/session.py`](../../vocoder/sdk/session.py)、[`vocoder/core/config.py`](../../vocoder/core/config.py)：本次核对过的现有声码器接口。
+- [`Melo.Vocoder/src/sdk/types.py`](../../Melo.Vocoder/src/sdk/types.py)、[`Melo.Vocoder/src/sdk/session.py`](../../Melo.Vocoder/src/sdk/session.py)、[`Melo.Vocoder/src/core/config.py`](../../Melo.Vocoder/src/core/config.py)：本次核对过的现有声码器接口。
 
 原资料引用的 TuneLab 代码和桌面 `架构v3.pdf` 不在本仓，本文没有将这些引用当作重新验证过的实现或性能证据。

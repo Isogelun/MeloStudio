@@ -4,14 +4,14 @@ import numpy as np
 import pytest
 import torch
 
-from vocoder.core.config import NHNVocoderConfig
-from vocoder.core.dsp import DSPConfig, DSPControlPredictor, DifferentiableDSP
-from vocoder.core.model import NHNVocoder
-from vocoder.preprocessing.audio import write_wav
-from vocoder.training.checkpoint import save_checkpoint
-from vocoder.training.post_train import save_post_training_checkpoint
-from vocoder.sdk import DSPControl, FeatureValueError, SynthesisRequest, VocoderSession
-from vocoder.training.train import main as train_main
+from melo.vocoder.core.config import NHNVocoderConfig
+from melo.vocoder.core.dsp import DSPConfig, DSPControlPredictor, DifferentiableDSP
+from melo.vocoder.core.model import NHNVocoder
+from melo.vocoder.preprocessing.audio import write_wav
+from melo.vocoder.training.checkpoint import save_checkpoint
+from melo.vocoder.training.post_train import save_post_training_checkpoint
+from melo.vocoder.sdk import DSPControl, FeatureValueError, SynthesisRequest, VocoderSession
+from melo.vocoder.training.train import main as train_main
 
 
 def _config():

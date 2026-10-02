@@ -2,8 +2,8 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from vocoder import NHNVocoder, NHNVocoderConfig
-from vocoder.core.layers import FramewiseFIRFilter, PolyphaseFilterBank
+from melo.vocoder import NHNVocoder, NHNVocoderConfig
+from melo.vocoder.core.layers import FramewiseFIRFilter, PolyphaseFilterBank
 
 
 def test_pqmf_filterbank_has_near_perfect_reconstruction():

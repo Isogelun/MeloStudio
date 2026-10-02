@@ -57,10 +57,10 @@ AudioResult [samples] + sample_rate
 
 ## 第一版 Python SDK 接口
 
-建议新增 `vocoder/sdk/`，公开以下接口：
+SDK 位于 `src/sdk/`，公开以下接口：
 
 ```python
-from vocoder.sdk import VocoderSession, LLSMFeatures, AudioResult
+from melo.vocoder.sdk import VocoderSession, LLSMFeatures, AudioResult
 
 session = VocoderSession.from_checkpoint(
     "best.pt",
@@ -416,23 +416,28 @@ L_total = L_base
 ## SDK 分层与实际文件结构
 
 ```text
-vocoder/
-├── entrypoints/
-│   ├── preprocess.py       # 普通/BWE 数据预处理统一入口
-│   ├── train.py            # 基模/DSP 后训练统一入口
-│   ├── export.py           # 模型导出统一入口
-│   └── infer.py            # 特征/音频推理统一入口
-├── preprocessing/         # LLSM72、F0、音频和数据准备实现
-├── training/              # 数据集、损失、判别器和训练实现
-├── inference/             # 推理、导出和 benchmark 实现
-├── core/                  # NHN 模型、FIR/PQMF 和 DSP
-├── sdk/
+Melo.Vocoder/
+├── src/
 │   ├── __init__.py
-│   ├── session.py          # VocoderSession
-│   ├── types.py            # LLSMFeatures / AudioResult / metadata
-│   ├── adapters.py         # NumPy/Torch/路径/mapping adapter registry
-│   └── errors.py           # 稳定公开异常
-└── configs/                # 两阶段训练 YAML
+│   ├── __main__.py            # python -m melo.vocoder
+│   ├── entrypoints/
+│   │   ├── preprocess.py      # 普通/BWE 数据预处理统一入口
+│   │   ├── train.py           # 基模/DSP 后训练统一入口
+│   │   ├── export.py          # 模型导出统一入口
+│   │   └── infer.py           # 特征/音频推理统一入口
+│   ├── preprocessing/        # LLSM72、F0、音频和数据准备实现
+│   ├── training/             # 数据集、损失、判别器和训练实现
+│   ├── inference/            # 推理、导出和 benchmark 实现
+│   ├── core/                 # NHN 模型、FIR/PQMF 和 DSP
+│   └── sdk/
+│       ├── __init__.py
+│       ├── session.py        # VocoderSession
+│       ├── types.py          # LLSMFeatures / AudioResult / metadata
+│       ├── adapters.py       # 输入 adapter registry
+│       └── errors.py         # 稳定公开异常
+├── configs/                  # 两阶段训练 YAML
+├── tests/
+└── docs/
 ```
 
 核心模型 `NHNVocoder.forward(features)` 不接受路径、WAV 或采样率参数。所有外部输入在

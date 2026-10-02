@@ -1,4 +1,4 @@
-# NHN vocoder
+# Melo.Vocoder
 
 这是一个面向 72 维 LLSM 条件特征的轻量、非自回归 harmonic-plus-noise
 声码器实现。它依据参考图实现了非因果门控卷积、三路动态 FIR 频谱头、十段噪声控制和
@@ -8,12 +8,12 @@
 
 | 工作流 | 统一入口 | 底层实现 | 相关配置或文档 |
 | --- | --- | --- | --- |
-| 预处理 | [entrypoints/preprocess.py](entrypoints/preprocess.py) | [preprocessing/](preprocessing/) | [输入与 SDK 规划](docs/vocoder-input-sdk-plan.md) |
-| 训练 | [entrypoints/train.py](entrypoints/train.py) | [training/](training/) | [5～10 小时原型配置](configs/nhn-prototype-5-10h.yaml)、[正式基模配置](configs/nhn-base.yaml)、[DSP 后训练配置](configs/nhn-dsp-post.yaml) |
-| 导出模型 | [entrypoints/export.py](entrypoints/export.py) | [inference/export.py](inference/export.py) | [P4 部署路线](docs/nhn-vocoder-roadmap.md#第四优先级部署已完成基础版) |
-| 推理 | [entrypoints/infer.py](entrypoints/infer.py) | [inference/synthesize.py](inference/synthesize.py) | [Python SDK](sdk/)、[输入与 SDK 规划](docs/vocoder-input-sdk-plan.md) |
+| 预处理 | [entrypoints/preprocess.py](src/entrypoints/preprocess.py) | [preprocessing/](src/preprocessing/) | [输入与 SDK 规划](docs/vocoder-input-sdk-plan.md) |
+| 训练 | [entrypoints/train.py](src/entrypoints/train.py) | [training/](src/training/) | [5～10 小时原型配置](configs/nhn-prototype-5-10h.yaml)、[正式基模配置](configs/nhn-base.yaml)、[DSP 后训练配置](configs/nhn-dsp-post.yaml) |
+| 导出模型 | [entrypoints/export.py](src/entrypoints/export.py) | [inference/export.py](src/inference/export.py) | [P4 部署路线](docs/nhn-vocoder-roadmap.md#第四优先级部署已完成基础版) |
+| 推理 | [entrypoints/infer.py](src/entrypoints/infer.py) | [inference/synthesize.py](src/inference/synthesize.py) | [Python SDK](src/sdk/)、[输入与 SDK 规划](docs/vocoder-input-sdk-plan.md) |
 
-核心网络在 [core/](core/)，完整阶段进度见 [NHN Vocoder 完善路线](docs/nhn-vocoder-roadmap.md)，
+核心网络在 [core/](src/core/)，完整阶段进度见 [NHN Vocoder 完善路线](docs/nhn-vocoder-roadmap.md)，
 DSP 控制和冻结基模后训练的设计见 [P5 DSP 后训练](docs/p5-dsp-post-training.md)。
 正式采集数据或配置机器前，请先看
 [推荐数据量与训练机器](docs/training-data-and-hardware.md)。
@@ -22,7 +22,7 @@ DSP 控制和冻结基模后训练的设计见 [P5 DSP 后训练](docs/p5-dsp-po
 
 ## 开始前需要准备
 
-- Python 3.12；仓库根目录已有 `.venv`，本目录的 `.venv` 符号链接会复用它。
+- Python 3.12；`uv sync` 会在本项目目录创建独立的 `.venv`。
 - 使用 uv 安装 [pyproject.toml](pyproject.toml) 和 [uv.lock](uv.lock) 中锁定的依赖。
 - 普通训练准备干净的人声 WAV；BWE 训练建议准备原始 48 kHz、单声道或可混为单声道的母带。
 - 特征提取需要 `analysis` 可选依赖；ONNX/TorchScript 部署验证需要 `export` 可选依赖。
@@ -46,13 +46,22 @@ DSP 控制和冻结基模后训练的设计见 [P5 DSP 后训练](docs/p5-dsp-po
 
 ## 安装与快速开始
 
-项目使用 Python 3.12 和 uv。先进入 `vocoder/` 项目目录；目录内的 `.venv`
-符号链接会复用仓库根目录现有的 Python 3.12 环境：
+项目使用 Python 3.12 和 uv。从仓库根目录进入 `Melo.Vocoder/`，安装项目与开发依赖：
 
 ```bash
-cd vocoder
+cd Melo.Vocoder
 uv sync --dev
+uv run python -c "from melo.vocoder import NHNVocoder, VocoderSession"
+uv run nhn-vocoder --help
+uv run pytest
 ```
+
+Python 导入包统一为 `melo.vocoder`，源码直接放在 `src/`，由 `pyproject.toml` 将该目录映射为 `melo.vocoder` 包。
+旧的 `from vocoder ...` 需要改为 `from melo.vocoder ...`。现有 `nhn-*` 命令名保留，
+也可以使用 `uv run python -m melo.vocoder --help` 调用统一入口。
+项目分发名仍为 `melostudio-nhn-vocoder`。
+
+已有安装在目录迁移后应重新执行 `uv sync --dev`；无需手工修改虚拟环境中的路径映射。
 
 ### PyTorch CPU 与 CUDA 版本
 
@@ -64,7 +73,7 @@ CPU/MPS 版本；某些 Linux 环境也可能装到不符合训练机要求的�
 优先使用官方 **CUDA 13.0** wheel：
 
 ```bash
-cd /Users/ad/MineCode/MeloStudio/vocoder
+cd /Users/ad/MineCode/MeloStudio/Melo.Vocoder
 
 # 安装项目依赖，但先跳过默认索引中的 torch
 uv sync --all-extras --dev --no-install-package torch
@@ -125,18 +134,24 @@ nhn-vocoder train --config configs/nhn-prototype-5-10h.yaml
 macOS 没有 CUDA wheel；本机显示 `torch.version.cuda == None` 是正常的，应使用 MPS/CPU
 做开发验证，正式 CUDA 训练放到 Linux 或 Windows NVIDIA 机器执行。
 
-代码按职责组织，`entrypoints/` 只保留四个面向用户的流程入口：
+代码按职责组织，`src/entrypoints/` 保留四个面向用户的流程入口：
 
 ```text
-vocoder/
-├── entrypoints/       # preprocess / train / export / infer
-├── preprocessing/    # 音频读取、F0/LLSM72、重采样、数据集预处理
-├── training/         # 数据集、损失、判别器、checkpoint、两阶段训练
-├── inference/        # 推理实现、模型导出、性能基准
-├── core/             # NHN 模型、卷积/FIR/PQMF、可微 DSP
-├── sdk/              # 上层 Python SDK
-├── configs/          # 基模与 DSP 后训练 YAML
-└── tests/
+Melo.Vocoder/
+├── pyproject.toml
+├── uv.lock
+├── src/                     # 映射为 melo.vocoder
+│   ├── __init__.py
+│   ├── __main__.py
+│   ├── entrypoints/         # preprocess / train / export / infer
+│   ├── preprocessing/
+│   ├── training/
+│   ├── inference/
+│   ├── core/                # NHN 模型、卷积/FIR/PQMF、可微 DSP
+│   └── sdk/
+├── configs/                 # 基模与 DSP 后训练 YAML
+├── tests/
+└── docs/
 ```
 
 统一命令只有四个主流程：
@@ -288,7 +303,7 @@ uv run nhn-vocoder infer input_16k.wav checkpoints/bwe1/best.pt outputs/output_4
 Python SDK：
 
 ```python
-from vocoder import LLSMFeatures, VocoderSession
+from melo.vocoder import LLSMFeatures, VocoderSession
 
 session = VocoderSession.from_checkpoint("checkpoints/bwe1/best.pt", device="cpu")
 features = LLSMFeatures.from_numpy(values)  # [T, 72] 或 [72, T]

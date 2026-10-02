@@ -1,6 +1,6 @@
 import numpy as np
 
-from vocoder.preprocessing.analyze import _fit_f0_length, _jobs, extract_f0
+from melo.vocoder.preprocessing.analyze import _fit_f0_length, _jobs, extract_f0
 
 
 def test_single_file_job(tmp_path):

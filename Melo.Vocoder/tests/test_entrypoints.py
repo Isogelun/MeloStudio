@@ -1,5 +1,5 @@
-from vocoder.entrypoints.__main__ import COMMANDS, main
-from vocoder.entrypoints import preprocess as preprocess_entry
+from melo.vocoder.entrypoints.__main__ import COMMANDS, main
+from melo.vocoder.entrypoints import preprocess as preprocess_entry
 
 
 def test_unified_cli_exposes_four_workflows(capsys):

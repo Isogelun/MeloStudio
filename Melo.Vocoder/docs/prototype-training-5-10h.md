@@ -20,7 +20,7 @@ NVIDIA 训练机应先按 [README 的 PyTorch CPU 与 CUDA 版本说明](../READ
 普通 LLSM72 → 48 kHz 声码器：
 
 ```bash
-cd /Users/ad/MineCode/MeloStudio/vocoder
+cd /Users/ad/MineCode/MeloStudio/Melo.Vocoder
 
 uv run --no-sync nhn-vocoder preprocess raw_wavs data/prototype_5_10h \
   --f0-backend fcpe --f0-device cuda

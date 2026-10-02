@@ -106,7 +106,7 @@ def main() -> None:
             records.append(
                 {"file": str(relative), "status": "failed", "error": str(error)}
             )
-            print(f"[{index}/{len(wav_paths)}] failed: {relative}: {error}")
+            print(f"[{index}/{len(audio_paths)}] failed: {relative}: {error}")
             if args.fail_fast:
                 raise
 

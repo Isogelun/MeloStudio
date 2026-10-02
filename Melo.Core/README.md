@@ -13,7 +13,7 @@ MeloStudio 的跨平台 C++20 核心库。核心代码只表达领域模型、�
 
 ## CLion 2026.2
 
-直接在 CLion 中打开本目录。进入 `Settings | Build, Execution, Deployment | CMake`，启用导入的 `Melo.Core Debug` Preset，并选择 `MSVC-x64` 工具链。
+直接在 CLion 中打开本目录。进入 `Settings | Build, Execution, Deployment | CMake`，启用导入的 `Melo.Core Debug` Preset，并选择适合当前系统的工具链：Windows 使用 `MSVC-x64`，macOS 使用 Apple Clang，Linux 使用 GCC 或 Clang。
 
 可用目标：
 
@@ -21,6 +21,8 @@ MeloStudio 的跨平台 C++20 核心库。核心代码只表达领域模型、�
 - `melo_core_tests`：无第三方依赖的基础测试。
 
 ## 命令行构建
+
+需要 CMake 3.28+、Ninja 和支持 C++20 的编译器。以下命令在 `Melo.Core/` 内执行。
 
 ```shell
 cmake --preset debug

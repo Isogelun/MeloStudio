@@ -6,3 +6,5 @@ data/
 checkpoints/
 outputs/
 deploy/
+build/
+dist/
