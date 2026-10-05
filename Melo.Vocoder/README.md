@@ -15,6 +15,12 @@
 
 核心网络在 [core/](src/core/)，完整阶段进度见 [NHN Vocoder 完善路线](docs/nhn-vocoder-roadmap.md)，
 DSP 控制和冻结基模后训练的设计见 [P5 DSP 后训练](docs/p5-dsp-post-training.md)。
+理解特征提取、编码与 Transformer 各自的作用，可先读
+[特征与 Transformer 原理说明](docs/transformer-feature-flow-explained.md)。
+声码器内部引入 Transformer 的位置、对照实验与验收条件见
+[Transformer Vocoder 评估方案](docs/transformer-vocoder-evaluation.md)。
+声源、气声、瞬态支路与 Transformer 的统一实验顺序见
+[Vocoder 声源与时间建模改进方案](docs/vocoder-source-and-conditioning-improvements.md)。
 正式采集数据或配置机器前，请先看
 [推荐数据量与训练机器](docs/training-data-and-hardware.md)。
 准备使用 5～10 小时数据验证时，直接参考
